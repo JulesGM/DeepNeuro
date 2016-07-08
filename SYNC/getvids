@@ -1,0 +1,2 @@
+#! /usr/bin/env bash
+rsync --partial --progress --append-verify  helios:"~/COCO/output/*.mp4" /home/jules/Documents/COCO_NEURO/output/

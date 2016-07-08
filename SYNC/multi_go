@@ -1,0 +1,34 @@
+#! /usr/bin/env bash
+to_helios
+HELIOS_CODE='
+    cd ~/COCO;
+    rm 9*.err 9*.out;
+    cat LAUNCHER/multithreaded_launcher.sh ;
+    for i in $(seq 0 7) ; do
+      export julesID=$i
+      msub -V LAUNCHER/multithreaded_launcher.sh;
+      echo $i
+    done ;
+    while true ; do
+        tput reset ;
+        cat 9*.out ;
+        sleep 2 ;
+
+        tput reset ;
+        cat 9*.err ;
+        sleep 2 ;
+    done ;
+'
+if [[ $1 == "q" ]] ; then
+  echo "We will kill the other jobs."
+  HELIOS_CODE="
+  qstat |
+    grep julesgm |
+    grep ' R ' |
+    grep -oE '[0-9]{5}' |
+    xargs -I {} qdel {};
+  $HELIOS_CODE
+  "
+fi ;
+
+ssh helios "$HELIOS_CODE"

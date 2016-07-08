@@ -1,0 +1,3 @@
+#! /usr/bin/env bash
+
+rsync --partial --progress -r /home/jules/Documents/COCO_NEURO/* helios:"~/COCO/" --exclude FAKE_SCRATCH --exclude mne_inst --exclude output --exclude ondisk
