@@ -3,8 +3,6 @@ export TERM="xterm-256color"
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/lustre2/software-gpu/compilers/pgi/15.10/linux86-64/2015/cuda/7.5/lib64/"
 
 export ENV="/home/julesgm/COCO/FAKE_SCRATCH/"
-export PYTHON="$ENV/myenv/bin/python"
-
 
 source "$ENV/myenv/bin/activate"
 if [[ $? -ne 0 ]] ; then

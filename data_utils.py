@@ -1,17 +1,17 @@
+from __future__ import print_function, generators, division
 from six.moves import cPickle as pickle
 import sys, os, re, fnmatch, subprocess as sp, argparse as ap, logging, threading
-import os, fnmatch, argparse as ap
+import mne, glob, subprocess as sp, os, sys, warnings, fnmatch, re
 
-import numpy as np
-
-from mne.io import Raw
 import mne.viz as viz
 import mne.io.pick
+mne.set_log_level("ERROR")
 
 from utils import *
 
 from matplotlib import use
-#use('Agg'); del use
+use('Agg'); del use
+
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
@@ -293,49 +293,131 @@ def make_samples(raw, labels, time_slice_length,
             feature = raw[i][i]
 """
 
+import warnings
+"""
 def maybe_load_data(data_path, limit = None):
-    print("Loading from fif.")
+
+    # :param data_path: Should be the path of the MEG2016 file.
+    # :param limit: Max number of files to load. For testing purposes.
+    # :return:
+
     raw = []
     labels = []
     filenames = []
     failed = 0
     total = 0
 
-    for sub_folder_name in os.listdir(data_path):
-        print(sub_folder_path)
-        sub_folder_path = os.path.join(data_path, sub_folder_name)
+    # We want to ignore all the "bad file name" mne keeps sending us.
+    # We should probably have a filter to specifically ignore these warnings, not all warnings.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
 
-        if not os.path.isdir(sub_folder_path):
-            print("'%s' is not a dir" % sub_folder_path)
-            continue
+        # For each file in MEG2016... (should be K** or R** folders)
+        for sub_folder_name in os.listdir(data_path):
 
-        for file_name in os.listdir(sub_folder_path):
-            if fnmatch.fnmatch(file_name, "*.fif") and "timecours" not in file_name:
+            sub_folder_path = os.path.join(data_path, sub_folder_name)
+            print(sub_folder_path)
 
-                print("at %s of %s, %s good" % (total, limit if limit is not None else "probably %s" % 651, total - failed))
-                total += 1
+            # Ignore all non-folders
+            if not os.path.isdir(sub_folder_path):
+                print("'%s' is not a dir" % sub_folder_path)
+                continue
 
-                file_path = os.path.join(sub_folder_path, file_name)
+            # For each file in the folders (should be *.fif)
+            for file_name in os.listdir(sub_folder_path):
+                if fnmatch.fnmatch(file_name, "*.fif") and "timecours" not in file_name:
+                    total += 1 # count the files
+                    file_path = os.path.join(sub_folder_path, file_name)
 
-                try:
-                    entry = Raw(file_path, preload=True)
+                    try:
+                        entry = Raw(file_path, preload=True)
 
-                except ValueError:
-                    # print("- File '%s' had no data. Skipping it." % file_path)
-                    failed += 1
-                    continue
+                    except ValueError:
+                        # Ignore malformed files.
+                        # print("- File '%s' had no data. Skipping it." % file_path)
+                        failed += 1
+                        continue
 
-                # Closer to being ok
-                raw.append(entry)
-                filenames.append(file_name)
-                labels.append(file_name[0].lower() == "k")
+                    # Append to the results
+                    raw.append(entry)
+                    filenames.append(file_name)
+                    labels.append(file_name[0].lower() == "k")
 
-                if limit and total - failed > limit:
-                    break
+                    if limit and total - failed > limit:
+                        break
 
-        if limit and total - failed > limit:
-            break
+            if limit and total - failed > limit:
+                break
 
-    print("TOTAL FAILED RATIO: %s" % (failed * 100. / total))
+    if total == 0:
+        raise RuntimeError("Zero fif files to open.")
+
+    print("TOTAL FAILED RATIO: %s ; %s failed vs %s total" % (failed * 100. / total, failed, total))
 
     return raw, np.array(labels)
+"""
+
+def data_gen(base_path, limit = None):
+
+    """
+    The objective is to never have exceptions, to always know what to ignore and why.
+
+    Test script:
+    to helios 1>/dev/null; ssh helios 'cd COCO; python -c "from data_utils import data_gen; [x for x in data_gen()]"'
+    """
+
+    base_path = os.path.abspath(base_path)
+
+
+    assert os.path.exists(base_path), "{base_path} doesn't exist".format(base_path=base_path)
+
+    full_glob = glob.glob(base_path + "/*.fif")
+
+    if len(full_glob) == 0:
+        raise RuntimeError("Datagen didn't find find any '.fif' files")
+
+    print("glob found {} .fif files".format(len(full_glob)))
+
+    if limit != None:
+        print(">>>>>>>>>> Warning: data_gen limit argument is not None.\n"
+              ">>>>>>>>>> This has the effect that only a limited amount ({})\n"
+              ">>>>>>>>>> of the data will be loaded. \n".format(limit))
+
+    fif_paths = full_glob[:limit] if limit is not None else full_glob
+
+    if len(fif_paths) == 0:
+        raise RuntimeError("fif_path is of size zero.")
+
+
+    failed = 0
+    for fif_path in fif_paths:
+        logging.info("Ignored ratio: {}" .format(failed / len(fif_paths)))
+        name = fif_path.split("/")[-1] # os.path.split appears broken somehow
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try:
+                raw = mne.io.Raw(fif_path)
+            except ValueError, err:
+                logging.error("-- data_gen ValueError:")
+                logging.error("-- %s" % name)
+                logging.error("-- %s\n" % err)
+                raise err
+            except TypeError, err:
+                logging.error("-- data_gen TypeError")
+                logging.error("-- %s" % name)
+                logging.error("-- %s\n" % err)
+                raise err
+
+        assert name.startswith("K") or name.startswith("R"), "file name is weird, can't guess label from it. ({})".format(name)
+        label = name.startswith("K")
+
+        print(raw)
+
+        yield raw, label
+
+        """
+        else:
+            failed += 1
+            logging.info("-- skipping '%s' " % name)
+        """

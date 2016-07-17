@@ -1,3 +1,69 @@
-tf.train.shuffle_batch
 
-I need to make a cheat sheet for the K sizes
+
+FEATURES:
+    """ Be done with a before monday """
+    1. test bench for :
+        a - psd method
+              welsh:
+                - time window length
+                - nfft
+
+        b - inference type
+
+CLASSICAL ML -> NO 2D:
+    - make functional
+    - list of grid search params
+
+CONVNETS:
+    - tf.train.shuffle_batch -> déjà fait?
+    .. make just convnet one functional
+    - make resnets functional
+    - make inception resnets functional
+    - gridsearch that shit
+
+CLASSICAL ML - 2D:
+    - grid search of same classifiers on
+        - CSP
+        - the other thing, lol.
+    - grid search classifiers directly on 2d
+
+deep TIME:
+    - make single layer LSTM ontop of convnets functional
+    - make multiple LSTM ontop of convnets functional
+    - make time conv layer ontop of convnets functional
+    - grid search
+
+
+
+-------------------------------------
+If I do this I will be very happy.
+Kind of impossible though.
+#####################################
+# for monday
+1. finish making psd test bench with classic classifier list functional
+2. finish making inference with classic classifier list functional
+# monday
+3. make convnet functional
+4. 2d testbench
+# tuesday
+5. resnet
+# wednesday
+6. inception resnet
+# thursday
+7. CSP and the other thing
+# friday
+empty
+-------------------------------------
+# monday
+1. time FC
+# tuesday
+2. time conv
+# wednesday
+3. time LSTM 1 lay
+# thursday
+empty
+# friday
+empty
+-------------------------------------
+# monday
+1. start writing ....

@@ -6,7 +6,7 @@ from mne.channels.layout import _auto_topomap_coords
 from mne.channels.channels import _contains_ch_type
 import numpy as np
 
-from ext_modules import *
+from _ext_modules import *
 #/usr/local/lib/python2.7/dist-packages/mne
 
 
