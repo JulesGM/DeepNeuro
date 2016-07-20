@@ -1,0 +1,31 @@
+#!/usr/bin/python
+"""
+get which modules to import
+"""
+from __future__ import print_function
+#from six.moves import iteritems
+import re
+from snakefood.filter import do_filter
+
+ignore_set = {"numpy"}
+
+modules_to_add = set()
+
+for x in do_filter():
+    (fbase, ffn), (tbase, tfn) = x
+    if ((re.match('/usr/lib/python', fbase) or
+         (tbase and re.match('/usr/lib/python', tbase))) and
+        not (re.match('site-packages', fbase) or
+             (tbase and re.match('site-packages', tbase)))):
+            continue
+
+    base_module = tfn.split("/")[0]
+
+    if base_module.endswith(".py"):
+        base_module = base_module[:-3]
+
+    if base_module.lower() not in ignore_set:
+        modules_to_add.add(base_module)
+
+for k in modules_to_add:
+    print(k)

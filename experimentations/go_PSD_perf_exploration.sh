@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 d_TARGET=helios
 
-
 if [[ -n $1 ]] ; then
     TARGET=$1;
     echo '$TARGET'" = $1"
@@ -10,6 +9,13 @@ else
     TARGET=$d_TARGET
 fi
 
+echo '< generating requirements.txt with sfood >'
+sfood /home/jules/Documents/COCO_NEURO/experimentations/ -e 2>/dev/null | sfood-essence > requirements.txt
+cat requirements.txt
+echo '</generating requirements.txt with sfood >'
+echo '< to // rsync >'
+to $TARGET 1>/dev/null
+echo '</to // rsync >'
 
 #################################
 # Setup of target specific code
@@ -28,28 +34,28 @@ else
     exit
 fi
 
-
-#################################
-#
-#################################
-
-echo "<rsync>"
+echo "< rsync >"
 /home/jules/Documents/COCO_NEURO/SYNC/to "$TARGET" >/dev/null
-echo "</rsync>"
+echo "</rsync >"
 
 
 VENV=/home/julesgm/COCO/FAKE_SCRATCH/myenv/bin/activate
 CMD="
 cd /home/julesgm/COCO/experimentations;
-echo '<module load python>'
+echo -e '\n'
+echo 'remote: < module load python >'
 module load ${PY_MODULE}
-echo '</module load python>'
-echo '<source VENV>'
+echo 'remote: </module load python >'
+echo 'remote: < source VENV >'
 source $VENV
-echo '</source VENV>'
-echo '<python exec>'
+echo 'remote: </source VENV >'
+echo 'remote: < pip install -r requirements.txt -U >'
+pip install -r requirements.txt -U 1>/dev/null
+echo 'remote: </pip install -r requirements.txt -U >'
+echo 'remote: < python exec >'
 python gw_PSD_perf_exploration.py --launcher $LAUNCHER --host $TARGET --data_path $DATA_PATH
-echo '</python exec>'
+echo 'remote: </python exec >'
+echo -e '\n'
 "
 
 echo "<ssh>"

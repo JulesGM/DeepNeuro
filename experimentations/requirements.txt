@@ -1,0 +1,5 @@
+six
+tflearn
+enum
+mne
+sklearn

@@ -30,8 +30,8 @@ def main(argv):
     tincr_max  = 10
     tincr_incr = 1
 
-    nfft_min  = 1000
-    nfft_max  = 1000
+    nfft_min  = 10
+    nfft_max  = 80
     nfft_incr = 100
 
     noverlap_min  = 0

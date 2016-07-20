@@ -9,8 +9,8 @@ mne.set_log_level("ERROR")
 
 from utils import *
 
-from matplotlib import use
-use('Agg'); del use
+#from matplotlib import use
+#use('Agg'); del use
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
@@ -412,12 +412,7 @@ def data_gen(base_path, limit = None):
         assert name.startswith("K") or name.startswith("R"), "file name is weird, can't guess label from it. ({})".format(name)
         label = name.startswith("K")
 
-        print(raw)
+        #print(raw)
 
         yield raw, label
 
-        """
-        else:
-            failed += 1
-            logging.info("-- skipping '%s' " % name)
-        """

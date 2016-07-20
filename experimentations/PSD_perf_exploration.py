@@ -1,4 +1,4 @@
-from __future__ import with_statement, print_function
+from __future__ import with_statement, print_function, division
 
 from six import iteritems
 from six.moves import zip as izip
@@ -6,10 +6,13 @@ from six.moves import zip as izip
 import sys, os, argparse, timeit, time, logging
 from subprocess import check_output
 from collections import defaultdict as dd, Counter
+import scipy
 
 import numpy as np
 import mne, mne.time_frequency
 from mne.decoding import CSP
+
+import tflearn
 
 """
 mne's logger is way to talkative, and neither mne.set_logging_level(logging.ERROR) or
@@ -108,10 +111,10 @@ def maybe_prep_psds(argv):
     # ARGUMENT PARSING
     ###########################################################################
     # DEFAULTS FOR THE ARGUMENTS
-    d_REP        = 1  # Number of repetitions, for timeit
-    d_GLOB_TINCR = 10 # Length of the time clips on which the PSDs are calculated
-    d_NOVERLAP   = 0  # Overlap between the time clips on which the PSDs are calculated
-    d_NFFT       = 256    # Quantity of fft bands
+    d_REP        = 1    # Number of repetitions, for timeit
+    d_GLOB_TINCR = 10  # Length of the time clips on which the PSDs are calculated
+    d_NOVERLAP   = 0    # Overlap between the time clips on which the PSDs are calculated
+    d_NFFT       = 2048   # Quantity of fft bands
 
     # Defaults that are used
     ## welch is much faster, like 50x faster. There is more leakage than multitaper, but the performance hit
@@ -133,7 +136,7 @@ def maybe_prep_psds(argv):
     p.add_argument("-o",  "--data_path",   type=str)
 
     # These don'psd_time_band_start need to be explored anymore (for the moment at least).
-    p.add_argument("-r",  "--reps",         type=int, default=d_REP)
+    p.add_argument("-r",  "--reps",        type=int, default=d_REP)
     p.add_argument(       "--min_procs",   type=int,  default=d_MIN_PROCS)
     p.add_argument(       "--max_procs",   type=int,  default=d_MAX_PROCS)
     p.add_argument("-f",  "--funcs",       type=str,  default=d_F)
@@ -189,10 +192,8 @@ def maybe_prep_psds(argv):
     # FEATURE PREPARATION
     ###########################################################################
     print("# FEATURE PREPARATION")
-
     # We want to time the compute time, not the data loading time.
     # The raw data is at preload = True to make this measure more relevant (less dependant on the HDD reads)
-    start = time.time()
 
     checked_min_procs = MIN_PROCS if MIN_PROCS else 1 # 1 if MIN_PROCS is 0 or None
 
@@ -200,32 +201,46 @@ def maybe_prep_psds(argv):
     Y = [] # Generated labels
 
     for raw, label in data_gen(DATA_PATH):
-            outer_time_bound = raw.n_times / 1000.
-            for procs_to_use in range(checked_min_procs, MAX_PROCS + 1):
-                for psd_band_t_start in range(GLOB_TMIN, GLOB_TMAX + 1, GLOB_TINCR):
+        #raw.plot_psd(show=True)
 
-                    if outer_time_bound < psd_band_t_start:
-                        reg_print("{} < {} ; rejected".format(outer_time_bound, psd_band_t_start))
-                        break
+        outer_time_bound = raw.n_times / 1000.
+        for procs_to_use in range(checked_min_procs, MAX_PROCS + 1):
+            for psd_band_t_start in range(GLOB_TMIN, GLOB_TMAX + 1, GLOB_TINCR):
+                if outer_time_bound < psd_band_t_start:
+                    # reg_print("{} < {} ; rejected".format(outer_time_bound, psd_band_t_start))
+                    break
 
-                    # So, the point here is that we don't want to crash if the raw is malformed.
-                    # However, just catching all ValueError's is really too permissive; we need to be more precise here.
-                    time_res, num_res = timed_psd(PSD_FUNC, REP, n_jobs=procs_to_use,
-                                                  inst=raw, picks=mne.pick_types(raw.info, meg=True), n_fft=NFFT,
-                                                  n_overlap=NOVERLAP, tmin=psd_band_t_start,
-                                                  tmax=psd_band_t_start + GLOB_TINCR, verbose="INFO")
+                # So, the point here is that we don't want to crash if the raw is malformed.
+                # However, just catching all ValueError's is really too permissive; we need to be more precise here.
+                num_res, freqs = mne.time_frequency.psd_welch(
+                                           n_jobs=procs_to_use,
+                                           inst=raw,
+                                           picks=mne.pick_types(raw.info, meg=True),
+                                           n_fft=NFFT,
+                                           n_overlap=NOVERLAP,
+                                           tmin=psd_band_t_start,
+                                           tmax=psd_band_t_start + GLOB_TINCR,
+                                           verbose="INFO"
+                                           )
 
-                    if X is None:
-                        X = num_res
+                num_res = 10 * np.log10(num_res)
+
+                #print(freqs)
+                #print(num_res)
+                #print("std_dev: {}".format(np.std(num_res)))
+                #print("mean: {}".format(np.average(num_res)))
+
+                if X is None:
+                    X = num_res
+                else:
+                    if num_res.shape[X_Dims.fft_ch.value] == X.shape[X_Dims.fft_ch.value]: # All samples need the same qty of fft channels
+                        X = np.dstack([X, num_res])
+                        
                     else:
-                        if num_res.shape[X_Dims.fft_ch.value] == X.shape[X_Dims.fft_ch.value]: # All samples need the same qty of fft channels
-                            X = np.dstack([X, num_res])
-                        else:
-                            print("num_res of bad shape '{}' rejected, should be {}".format(num_res.shape, X.shape[:2]))
-                            continue
+                        print("num_res of bad shape '{}' rejected, should be {}".format(num_res.shape, X.shape[:2]))
+                        continue
 
-                    Y.append(label)
-
+                Y.append(label)
 
     assert X is not None, "X is None"
 
@@ -238,12 +253,11 @@ def maybe_prep_psds(argv):
 
     assert len(X.shape) == X_Dims.size.value
     assert X.shape[X_Dims.samples_and_times.value] == Y.shape[0], X.shape[X_Dims.samples_and_times.value]  # no_samples
-    # assert X.shape[1] == 129, X.shape[1] # ~ nfft: 129 lectures for each of
     assert X.shape[X_Dims.sensors.value] == 306, X.shape[X_Dims.sensors.value]  # sensor no
-    #assert X.shape[X_Dims.fft_ch] = ? #
 
     print("X.shape = {}".format(X.shape))
     print("Y.shape = {}".format(Y.shape))
+
 
     return X, Y
 
@@ -254,18 +268,39 @@ def make_picks(no_samples):
     ###########################################################################
     print("# DATA SPLIT")
 
+    # print("CURRENTLY USING CONSTANT RANDOM SEED")
+    # np.random.seed(0)
+
     training_limit = int(.6 * no_samples)
     valid_limit = training_limit + int(.2 * no_samples)
     randomized = np.random.permutation(no_samples)
     training_picks = randomized[:training_limit]
     valid_picks = randomized[training_limit:valid_limit]
     test_picks = randomized[valid_limit:]
+
     return training_picks, valid_picks, test_picks
 
 
 def make_samples_linear(X, Y):
     linear_X = X.reshape(X.shape[X_Dims.samples_and_times.value],  X.shape[X_Dims.fft_ch.value] * X.shape[X_Dims.sensors.value])
     return linear_X, Y
+
+
+def to_one_hot(input, max_classes):
+    no_samples = input.shape[0]
+    output = np.zeros((input.shape[0], max_classes), np.float32)
+    output[np.arange(no_samples), input.astype(np.int32)] = 1
+    return output
+
+def from_one_hot(values):
+    return np.argmax(values, axis=1)
+
+def stats(Y):
+    y_count = Counter(Y.tolist())
+    print("########################################")
+    print("Count: {}".format(y_count))
+    print("Ratio: {}".format(y_count[y_count.keys()[0]] / (sum(y_count.values()))))
+    print("########################################")
 
 
 def linear_classification(linear_X, linear_Y, train_picks, valid_picks, test_picks):
@@ -277,57 +312,265 @@ def linear_classification(linear_X, linear_Y, train_picks, valid_picks, test_pic
     err_print(header)
     reg_print(header)
 
-    assert len(linear_X.shape) == 2
-    from sklearn.svm import SVC
-    from sklearn.linear_model import logistic
-    from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as lda
-    from sklearn.ensemble import RandomForestClassifier
+    linear_X = linear_X / np.std(linear_X)
 
+    assert len(linear_X.shape) == 2
+
+    from sklearn.svm import SVC
+    from sklearn.svm import LinearSVC
+    from sklearn.linear_model import logistic
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.neighbors import KNeighborsClassifier
+
+    #linear_X = np.random.rand(*linear_X.shape)
 
     # We currently only use sklearn classifiers and they all use the same interface, so we just build
     # the classifiers in a list and try them iteratively.
     # Eventually, we will have more precise configs for them, undoubtably
+    #stats(np.array(linear_Y))
+
+    # feedforward neural net
+    logging.getLogger("tflearn")
+    tflearn.init_graph(num_cores=1, gpu_memory_fraction=0.75)
+    net = tflearn.input_data(shape=[None, linear_X.shape[1]])
+    # net = tflearn.fully_connected(net, 100)
+    # net = tflearn.dropout(net, 0.5)
+    net = tflearn.fully_connected(net, 2, activation="softmax")
+    import tensorflow as tf
+    net = tflearn.regression(net, optimizer="adam", loss="categorical_crossentropy")
+    dnn = tflearn.DNN(net)
+
+
+
+
+    import tensorflow as tf
+    class Feedforward(object):
+        def __init__(self, input_ph_shape, output_ph_shape):
+
+
+
+            self.x_ph = tf.placeholder(dtype=tf.float32, shape=input_ph_shape)
+            self.y_ph = tf.placeholder(dtype=tf.float32, shape=output_ph_shape)
+
+            # x dim 0: samples #
+            # x dim 1: feature dimensions
+
+            # y dim 0: sample #
+            # y dim 1: label dimension // one hot output
+
+            w0_s = (input_ph_shape[1], output_ph_shape[1])      # x_[1], y_[1]
+            b0_s = (output_ph_shape[1],)                      #
+
+            self.w0 = tf.Variable(initial_value=tf.truncated_normal(w0_s), dtype=tf.float32)
+            self.b0 = tf.Variable(initial_value=tf.truncated_normal(b0_s), dtype=tf.float32)
+
+
+            self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(tf.matmul(self.x_ph, self.w0) + self.b0, self.y_ph) ) + tf.nn.l2_loss(self.w0)
+            self.opt = tf.train.AdamOptimizer(0.00001).minimize(self.loss)
+
+            self.classif = tf.nn.softmax(tf.matmul(self.x_ph, self.w0) + self.b0)
+
+        def fit(self, X, Y, n_epoch, minibatch_size=64):
+            std_x = np.std(X)
+            assert std_x > 1E-3, std_x
+
+            std_y = np.std(Y)
+            assert std_y > 1E-3, std_y
+
+
+            # tf_X = tf.convert_to_tensor(X)
+            # tf_Y = tf.convert_to_tensor(Y)
+
+            with tf.Session() as s:
+                s.run([tf.initialize_all_variables()])
+                for i in xrange(n_epoch):
+                    print("EPOCH {}".format(i))
+                    for j in xrange(0, X.shape[0] // minibatch_size + 1):
+                        idx_from = j * minibatch_size
+                        idx_to   = min((j + 1) * minibatch_size, X.shape[0] - 1)
+                        diff = idx_to - idx_from
+
+                        if diff == 0:
+                            print("diff == 0, skipping")
+                            break;
+
+                        loss, opt = s.run([self.loss, self.opt],
+                                          feed_dict={
+                                                     self.x_ph: X[idx_from:idx_to, :],
+                                                     self.y_ph: Y[idx_from:idx_to, :]
+                                                     }
+                                          )
+
+                        print("loss: {}".format(loss))
+
+                    preds = s.run(self.classif, feed_dict={self.x_ph: X})
+                    # print("Y:")
+                    # print(Y)
+                    print("argmax preds:")
+                    #print(np.argmax(preds, axis=1))
+                    #print(preds)
+                    # print("argmax Y:")
+                    # print(np.argmax(Y, axis=1))
+
+                    print("score: {}".format(np.mean(np.argmax(Y, axis=1) == np.argmax(preds, axis=1))))
+                    print("mean anser: {}".format(np.mean(preds)))
+
+    """
+        def predict(self, X):
+            assert X.dtype == np.float32, X.dtype
+
+            with tf.Session() as s:
+                return s.run([self.classif], feed_dict={self.x_ph: X})
+    """
+
     classifiers = [
-        SVC(kernel="linear"),
-        logistic.LogisticRegression(),
-        RandomForestClassifier(),
-        # lda()
-    ]
+                   Feedforward([None, linear_X.shape[1]], [None, 2]),  # The first None is the Number of minibatches. .. The second one too.
+                 #  dnn,
+                   SVC(tol=1e-4, kernel="poly"),
+                   LinearSVC(),
+                   logistic.LogisticRegression(),
+                   RandomForestClassifier(n_estimators=10),
+                   KNeighborsClassifier(),
+                   ]
+
+    one_hot_set = {tflearn.DNN, Feedforward}
+    from collections import Counter
+    assert np.std(linear_X) > 1E-4
+
 
     for classifier in classifiers:
-        reg_print(linear_X.dtype)
-        reg_print(linear_X.shape)
-        reg_print(linear_Y.dtype)
-        reg_print(linear_Y.shape)
-        classifier.fit(linear_X[train_picks, :], linear_Y[train_picks])
+        if type(classifier) in one_hot_set:
+            features_tr = linear_X[train_picks, :]
+            labels_tr = to_one_hot(linear_Y[train_picks], 2)
+            assert np.std(features_tr) > 1E-3
+            assert np.std(labels_tr) > 1E-3
 
-    trainning_pred = {}
-    trainning_succ = {}
+            features_va = linear_X[valid_picks, :]
+            labels_va = to_one_hot(linear_Y[valid_picks], 2)
+            assert np.std(features_va) > 1E-3
+            assert np.std(labels_va) > 1E-3
+
+
+            classifier.fit(features_tr, labels_tr, n_epoch=1000) #, validation_set=(features_va, labels_va))
+
+
+            if type(classifier) == tflearn.DNN:
+                predicted_va = np.argmax(classifier.predict(features_va), axis=1)
+                print("-------------------------------------")
+                print("mean: {}".format(                       np.mean(predicted_va == labels_va)        ))
+                print("valid predicted Counter: {}".format(    Counter(predicted_va)                     ))
+                print("valid labels Counter: {}".format(       Counter(linear_Y[valid_picks].tolist())   ))
+                print("-------------------------------------")
+
+        else:
+            features_tr = linear_X[train_picks, :]
+            labels_tr = linear_Y[train_picks]
+
+            features_va = linear_X[valid_picks]
+            labels_va = linear_Y[valid_picks]
+
+            cl = classifier.fit(features_tr, labels_tr)
+
+            print("-------------------------------------")
+            print("classifier: {}".format(classifier))
+            print("score: {}".format(cl.score(features_va, labels_va)))
+            print("avg: {}".format(np.average(cl.predict(features_va))))
+            print("-------------------------------------")
+
+
+def spatial_classification(interp_X, interp_Y, train_picks, valid_picks, test_picks):
+    # normalization
+    interp_X = (interp_X - np.average(interp_X)) / np.std(interp_X)
+
+    # Real-time data augmentation
+    # img_aug = tflearn.ImageAugmentation()
+    # img_aug.add_random_flip_leftright()
+    # img_aug.add_random_rotation(max_angle=5)
+
+    # img_prep = ImagePreprocessing()
+    # img_prep.add_featurewise_zero_center()
+    # img_prep.add_featurewise_stdnorm()
+
+    # Convolutional network building
+    network = tflearn.input_data(shape=[None, 32, 32, 3],
+                         #data_preprocessing=img_prep,
+                         #data_augmentation=img_aug
+                                 )
+    network = tflearn.conv_2d(network, 32, 3, activation='relu')
+    network = tflearn.max_pool_2d(network, 2)
+    network = tflearn.conv_2d(network, 64, 3, activation='relu')
+    network = tflearn.conv_2d(network, 64, 3, activation='relu')
+    network = tflearn.max_pool_2d(network, 2)
+    network = tflearn.fully_connected(network, 512, activation='relu')
+    network = tflearn.dropout(network, 0.5)
+    network = tflearn.fully_connected(network, 10, activation='softmax')
+    network = tflearn.regression(network, optimizer='adam',
+                         loss='categorical_crossentropy',
+                         learning_rate=0.001)
+
+    # Train using classifier
+    model = tflearn.DNN(network, tensorboard_verbose=0)
+    model.fit(interp_X, interp_Y, n_epoch=50, shuffle=True, validation_set=(interp_X[valid_picks], interp_Y[valid_picks]),
+              show_metric=True, batch_size=96)
+
+    classifiers = [model]
+    one_hot_set = {model}
 
     for classifier in classifiers:
-        trainning_pred[classifier] = classifier.predict(linear_X[valid_picks, :])
-        trainning_succ[classifier] = np.average(trainning_pred[classifier] == linear_Y[valid_picks])
+        if type(classifier) in one_hot_set:
+            features_tr = interp_X[train_picks, :]
+            labels_tr = to_one_hot(interp_Y[train_picks], 2)
 
-        reg_print("classifier:\n\t- {classifier}\n\t- {success}\n\t- {score}"
-            .format(
-                classifier=classifier,
-                success=trainning_succ[classifier],
-                score=classifier.score(linear_X[valid_picks, :], linear_Y[valid_picks])))
+            features_va = interp_X[valid_picks]
+            labels_va = to_one_hot(interp_Y[valid_picks], 2)
+
+            classifier.fit(features_tr, labels_tr, n_epoch=10000, validation_set=(features_va, labels_va))
+
+            predicted_va = np.argmax(classifier.predict(features_va), axis=1)
+
+            print(np.mean(predicted_va == labels_va))
+            print(Counter(predicted_va))
+            print(Counter(interp_Y[valid_picks].tolist()))
+
+        else:
+            raise RuntimeError("Landed in a dead section")
+
+def make_interpolated_data(X, Y, min_width, max_width, min_height, max_height, res, method):
+
+    grid = np.mgrid[min_width:max_width:res[0]], np.mgrid[min_height:max_height:res[0]]
+    interp_X = []
+    for i in xrange(X.shape[X_Dims.fft_ch.value]):
+        interp_X.append(scipy.interp.griddata(X, Y, grid, method))
+
+    interp_X = np.vstack(interp_X)
+
+    return interp_X
 
 def main(argv):
     start = time.time()
 
     X, Y = maybe_prep_psds(argv) # argv being passed is temporary
 
+    print("")
+    print(np.average(X))
+    std_dev = np.std(X)
+    print(std_dev)
+    print("")
+
     ###########################################################################
     # CLASSICAL MACHINE LEARNING CLASSIFICATION without locality
     ###########################################################################
 
-    reg_print("# CLASSICAL MACHINE LEARNING")
+    training_picks, valid_picks, test_picks = make_picks(X.shape[0])
 
+    reg_print("# CLASSICAL MACHINE LEARNING")
     linear_X, linear_Y = make_samples_linear(X, Y)
-    linear_training_picks, linear_valid_picks, linear_test_picks = make_picks(linear_X.shape[0])
-    linear_classification(linear_X, linear_Y, linear_training_picks, linear_valid_picks, linear_test_picks)
+
+    linear_classification(linear_X, linear_Y, training_picks, valid_picks, test_picks)
+
+    # reg_print("# SPATIAL MACHINE LEARNING")
+    # interp_X = make_interpolated_data(X, Y, 0, 200, 0, 200, (1000, 1000), "Cubic")
+    # spatial_classification(interp_X, Y, training_picks, valid_picks, test_picks)
 
     ###########################################################################
     # LOCALITY PRESERVING CLASSICAL MACHINE LEARNING
