@@ -1,0 +1,9 @@
+seaborn
+enum34
+six
+matplotlib
+scipy
+tflearn
+h5py
+mne
+sklearn
