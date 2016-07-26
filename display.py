@@ -10,7 +10,7 @@ import h5py
 
 if len(sys.argv) <= 1:
     if check_output(["hostname"]).startswith("helios"):
-        path = "/home/julesgm/COCO/experimentations/scores"
+        path = "/home/julesgm/COCO/scores"
     else:
         path = os.path.dirname(__file__) + "/scores/"
 

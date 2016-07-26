@@ -24,13 +24,13 @@ else
 fi
 
 
-# echo  -e "${LB}<pylint -E ./experimentations/*.py>${C_reset}\n"
-# pylint -E ~/Documents/COCO_NEURO/experimentations/*.py  2>&1 | sed 's/^/\t/'
-# echo  -e "\n${LB}</pylint -E ./experimentations/*.py>${C_reset}"
+# echo  -e "${LB}<pylint -E ./*.py>${C_reset}\n"
+# pylint -E ~/COCO/*.py  2>&1 | sed 's/^/\t/'
+# echo  -e "\n${LB}</pylint -E ./*.py>${C_reset}"
 
 
 echo  -e "${LB}<generating requirements.txt with sfood>${C_reset}\n"
-sfood /home/jules/Documents/COCO_NEURO/experimentations/ -e 2>/dev/null | sfood-essence 2>/dev/null | tee requirements.txt | sed 's/^/\t/'
+sfood ~/COCO/ -e 2>/dev/null | sfood-essence 2>/dev/null | tee requirements.txt | sed 's/^/\t/'
 echo -e "\n$LB</generating requirements.txt with sfood>$C_reset"
 echo -e "$LB<to::rsync>$C_reset\n"
 to $TARGET | sed 's/^/\t/'
@@ -56,7 +56,7 @@ REM="${DB}remote:${C_reset} "
 
 VENV=/home/julesgm/COCO/FAKE_SCRATCH/myenv/bin/activate
 CMD="
-cd /home/julesgm/COCO/experimentations
+cd /home/julesgm/COCO/
 echo -e '\n'
 echo -e \"${REM}${LB}<module load python>$C_reset\"
 module load ${PY_MODULE} | sed 's/^/\t/'

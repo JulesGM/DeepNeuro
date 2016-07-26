@@ -3,7 +3,10 @@ enum34
 six
 matplotlib
 scipy
+snakefood
 tflearn
 h5py
+pyximport
 mne
+skimage
 sklearn

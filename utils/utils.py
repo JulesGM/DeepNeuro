@@ -6,8 +6,27 @@ from mne.channels.layout import _auto_topomap_coords
 from mne.channels.channels import _contains_ch_type
 import numpy as np
 
+import _ext_modules
 from _ext_modules import *
 #/usr/local/lib/python2.7/dist-packages/mne
+
+
+class X_Dims(enum.Enum):
+    samples_and_times = 0
+    fft_ch = 1
+    sensors = 2
+    size = 3
+
+
+def to_one_hot(input, max_classes):
+    no_samples = input.shape[0]
+    output = np.zeros((input.shape[0], max_classes), np.float32)
+    output[np.arange(no_samples), input.astype(np.int32)] = 1
+    return output
+
+
+def from_one_hot(values):
+    return np.argmax(values, axis=1)
 
 
 def azim_proj(pos):

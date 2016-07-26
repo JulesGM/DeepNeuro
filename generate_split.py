@@ -6,7 +6,7 @@ import numpy as np
 
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from data_utils import *
+from utils.data_utils import *
 
 from collections import defaultdict
 
