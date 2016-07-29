@@ -18,9 +18,10 @@ else:
 
 exclude_list = [
                 "modules_repo/",
-                "experimentations/scores/",
-                "experimentations/fif_split.json",
+                "scores/",
+                "fif_split.json",
                 ".git/",
+                "*.json",
                 ]
 
 abs_exclude_set = {re.sub("/+", "/", "{}/{}".format(BASE_PATH, rel)) for rel in exclude_list}

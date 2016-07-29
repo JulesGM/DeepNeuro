@@ -15,9 +15,7 @@ from linear_classification import *
 from spatial_classification import *
 
 # scipy/numpy/matplotlib/tf
-import numpy as np
-import scipy
-
+import numpy as np, scipy
 import h5py
 
 """
@@ -26,7 +24,6 @@ logging.basicConfig(level=logging.ERROR) work.
 """
 logger = logging.getLogger('mne')
 logger.disabled = True
-
 
 
 def parse_args(argv):
@@ -52,6 +49,8 @@ def parse_args(argv):
     d_GLOB_TMIN = 0
     d_GLOB_TMAX = 1000
 
+    d_JOB_TYPE = "NN"
+
     # ARGUMENT PARSING
     p = argparse.ArgumentParser(argv)
     p.add_argument("--nfft", type=int, default=d_NFFT)
@@ -67,8 +66,9 @@ def parse_args(argv):
     p.add_argument("--glob_tmin", type=int, default=d_GLOB_TMIN)
     p.add_argument("--glob_tmax", type=int, default=d_GLOB_TMAX)
 
-    return p.parse_args(argv[1:])
+    p.add_argument("--job_type", type=str, default=d_JOB_TYPE)
 
+    return p.parse_args(argv[1:])
 
 
 def main(argv):
@@ -87,7 +87,6 @@ def main(argv):
     args = parse_args(argv)
 
 
-
     json_split_path = os.path.join(BASE_PATH, "fif_split.json")
     print("#1: {}".format(json_split_path))
 
@@ -99,24 +98,28 @@ def main(argv):
 
     for i in xrange(3):
         print("")
-        print(np.average(X[i]))
-        std_dev = np.std(X[i])
-        print(std_dev)
+        print("overall X stddev: {}".format(np.average(X[i])))
+        print("overall X stddev: {}".format(np.std(X[i])))
         print("")
 
     ###########################################################################
     # CLASSICAL MACHINE LEARNING CLASSIFICATION without locality
     ###########################################################################
 
+    print("################################################################")
     print("# CLASSICAL MACHINE LEARNING")
-
-    linear_X = [None, None, None]
+    print("################################################################")
+    linear_x = [None, None, None]
     linear_Y = [None, None, None]
 
+    print("# Information about the linearized dataset")
+    names=["training", "validation", "testing"]
     for i in xrange(3):
-        linear_X[i], linear_Y[i] = make_samples_linear(X[i], Y[i])
+        linear_x[i], linear_Y[i] = make_samples_linear(X[i], Y[i])
+        print("#\tshape of linear_x {}: {}".format(names[i], linear_x[i].shape))
+        print("#\tstddev: {}\n\tmean: {}".format(np.std(linear_x[i]), np.mean(linear_x[i])))
 
-    linear_classification(linear_X, linear_Y)
+    linear_classification(linear_x, linear_Y, args.job_type)
 
     # reg_print("# SPATIAL MACHINE LEARNING")
     # interp_X = make_interpolated_data(X, (1000, 1000), "cubic", sample_info)

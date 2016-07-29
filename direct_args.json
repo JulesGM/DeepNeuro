@@ -1,0 +1,1 @@
+["./PSD_perf_exploration.py", "--glob_tincr", "10", "--noverlap", "0", "--job_type", "NN", "--nfft", "8", "-o", "/home/jules/../julesgm/aut_gamma"]

@@ -7,7 +7,10 @@ import argparse, sys, os, subprocess as sp
 
 import json
 """
-http://martinos.org/mne/stable/generated/mne.time_frequency.psd_welch.html#mne.time_frequency.psd_welch
+
+This script is meant to be run on the gateway computer.
+It's the one that starts the actual jobs.
+
 """
 def main(argv):
     ###########################################################################
@@ -32,6 +35,7 @@ def main(argv):
     p = argparse.ArgumentParser()
     p.add_argument("--host",        type=str)
     p.add_argument("--data_path",   type=str)
+    p.add_argument("--job_type",    type=str)
     args = p.parse_args(argv[1:])
 
     ###########################################################################
@@ -40,21 +44,27 @@ def main(argv):
     SCRIPT_PATH = os.path.join(BASE_PATH, "msub_PSD_perf_exploration.sh")
     walltime = "10:00:00" # this is the max we are allowed
 
-    tincr_min = 10
-    tincr_max = 10
-    tincr_incr = 1
+    #
+    tincr_constant = 2
+    tincr_min_exp = 3
+    tincr_max_exp = 3#3
+    tincr_incr_exp = 1
 
-    nfft_min = 10
-    nfft_max = 80
-    nfft_incr = 100
 
+    nfft_constant = 3
+    nfft_min_exp = 2
+    nfft_max_exp = 2#3
+    nfft_exp_incr = 1
+
+    # Currently, novelap == 0
     noverlap_min = 0
     noverlap_max = 0
     noverlap_incr = 10
 
     JOB_QTY_LIMIT = 1001
-    total_jobs = ((tincr_max - tincr_min) // tincr_incr) * ((noverlap_max - noverlap_min) // noverlap_incr) * (
-        (nfft_max - nfft_min) // nfft_incr)
+    total_jobs = ((tincr_max_exp - tincr_min_exp + 1) // tincr_incr_exp) * ((noverlap_max - noverlap_min + 1) // noverlap_incr) * (
+        (nfft_max_exp - nfft_min_exp + 1) // nfft_exp_incr)
+
     print("Total jobs: {}".format(total_jobs))
 
     assert total_jobs < JOB_QTY_LIMIT, \
@@ -67,27 +77,19 @@ def main(argv):
     # Do the grid search by running a bunch of jobs on the cluster with different variable ranges
 
     launcher_args = {}
-    for tincr in xrange(tincr_min, tincr_max + 1, tincr_incr):
-        for nfft in xrange(nfft_min, nfft_max + 1, nfft_incr):
+    for tincr_exp in xrange(tincr_min_exp, tincr_max_exp + 1, tincr_incr_exp):
+        for nfft_exp in xrange(nfft_min_exp, nfft_max_exp + 1, nfft_exp_incr):
             for noverlap in xrange(noverlap_min, noverlap_max + 1, noverlap_incr):
                 # Test 2 : noverlap < nfft // 2
-                try:
-                    assert noverlap <= nfft // 2, "noverlap > nfft // 2; got noverlap=={noverlap} and nfft=={nfft}." \
-                    "THIS COMBINATION OF VALUES WILL BE IGNORED, BUT THE SCRIPT CONTINUES."\
-                        .format(noverlap=noverlap, nfft=nfft).replace("\t", "")
 
-                except AssertionError, err:
-                    print(err)
-                    continue
-
-                launcher_args["--nfft"] =       nfft
+                launcher_args["--nfft"] =       nfft_constant ** nfft_exp
                 launcher_args["--glob_tmin"] =  0
-                # launcher_args["--glob_tmax"] =  None
-                launcher_args["--glob_tincr"] = tincr
+                launcher_args["--glob_tincr"] = tincr_constant**tincr_exp
                 launcher_args["--noverlap"] =   noverlap
                 launcher_args["-o"] =           args.data_path
+                launcher_args["--job_type"] =   args.job_type
                 assert len(
-                    launcher_args) == 5, "Meant to be a proof that we change the whole dict every inner loop. Got %s, should've gotten 5." % len(
+                    launcher_args) == 6, "Meant to be a proof that we change the whole dict every inner loop. Got %s, should've gotten 5." % len(
                     launcher_args)
 
                 # The script is only loading appropriate modules and forwarding a bunch of args to a python script.

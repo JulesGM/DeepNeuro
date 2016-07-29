@@ -4,6 +4,7 @@
 # is to indent the output of commands
 
 d_TARGET=helios
+d_JOBTYPE="linear"
 
 C_reset='\033[00m'
 C_white='\033[01;37m'
@@ -16,12 +17,23 @@ DB=${C_light_blue}
 
 
 if [[ -n $1 ]] ; then
-    TARGET=$1;
+    TARGET="$1";
     echo -e '$TARGET'" = $1\n"
 else
-    echo -e 'Defaulting to $TARGET = '"$d_TARGET"
+    echo -e 'Defaulting to $TARGET='"$d_TARGET"
     TARGET=$d_TARGET
 fi
+
+if [[ -n $2 ]] ; then
+    JOBTYPE="$2";
+    echo -e '$JOBTYPE'" = $2\n"
+else
+    echo -e 'Defaulting to $JOBTYPE='"$d_JOBTYPE"
+    TARGET=$d_JOBTYPE
+fi
+
+
+
 
 
 # echo  -e "${LB}<pylint -E ./*.py>${C_reset}\n"
@@ -68,7 +80,7 @@ echo -e \"${REM}${LB}<pip install -r requirements.txt -U>$C_reset\"
 pip install -r requirements.txt -U 1>/dev/null
 echo -e \"${REM}${LB}</pip install -r requirements.txt -U>$C_reset\"
 echo -e \"${REM}${LB}<python exec>$C_reset\n\"
-python gw_PSD_perf_exploration.py --host $TARGET --data_path $DATA_PATH 2>&1 | sed 's/^/\t/'
+python gw_PSD_perf_exploration.py --host $TARGET --data_path $DATA_PATH --job_type $JOBTYPE 2>&1 | sed 's/^/\t/'
 echo -e \"${REM}${LB}</python exec>$C_reset\"
 echo -e \"\n\"
 "

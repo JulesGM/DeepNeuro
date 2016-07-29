@@ -13,7 +13,7 @@ from collections import defaultdict
 def main(argv):
     """
     This script generates training/validation/test split of the input files, and saves them to fif_split.json.
-    This script is to be only ran once. Really.
+    This script is to be only ran once.
     """
 
     print("************************GENERATE_SPLIT************************")
@@ -47,8 +47,8 @@ def main(argv):
 
     split = {}
     split["training"] = by_labels[0][valid_split_c0 + test_split_c0:] + by_labels[1][valid_split_c1 + test_split_c1:]
-    split["valid"] = by_labels[0][valid_split_c0:valid_split_c0 + test_split_c0] + by_labels[1][valid_split_c1:valid_split_c1 + test_split_c1]
-    split["test"] = by_labels[0][0:valid_split_c0] + by_labels[1][0:valid_split_c1]
+    split["valid"] = by_labels[0][0:valid_split_c0] + by_labels[1][0:valid_split_c1]
+    split["test"] = by_labels[0][valid_split_c0:valid_split_c0 + test_split_c0] + by_labels[1][valid_split_c1:valid_split_c1 + test_split_c1]
 
     for k in split.keys():
         random.shuffle(split[k])

@@ -1,11 +1,12 @@
-from __future__ import print_function, generators, division
+from __future__ import print_function, generators, division, with_statement
 from six import iteritems
 import os, sys, re, glob, warnings, logging, enum, json
 import mne.io.pick
 import mne
 import numpy as np
-mne.set_log_level("ERROR")
+from utils import *
 
+mne.set_log_level("ERROR")
 
 def data_gen(base_path, limit = None):
     """
@@ -87,9 +88,9 @@ def maybe_prep_psds(args):
     MIN_PROCS    = args.min_procs
     MAX_PROCS    = args.max_procs
     NFFT         = args.nfft
-    GLOB_TMIN    = args.glob_tmin
-    GLOB_TMAX    = args.glob_tmax
-    GLOB_TINCR   = args.glob_tincr
+    GLOB_TMIN_s    = args.glob_tmin
+    GLOB_TMAX_s    = args.glob_tmax
+    GLOB_TINCR_s   = args.glob_tincr
     NOVERLAP     = args.noverlap
     DATA_PATH    = args.data_path
 
@@ -103,7 +104,7 @@ def maybe_prep_psds(args):
     X = [None, None, None] # Generated PSDs
     Y = [[], [], []] # Generated labels
 
-    BASE_PATH = os.path.dirname(__file__)
+    BASE_PATH = os.path.dirname(os.path.dirname(__file__))
     json_path = os.path.join(BASE_PATH, "fif_split.json")
     print("#2: {}".format(json_path))
     with open(json_path, "r") as json_f:
@@ -114,42 +115,68 @@ def maybe_prep_psds(args):
                          "test":      2,
                          }
 
+
+    procs_to_use = 1
+    GLOB_TINCR_s = 0.1
+
+    freqs_bands = None
+
     for name, raw, label in data_gen(DATA_PATH):
         split_idx = split_idx_to_name[fif_split[name]]
 
-        outer_time_bound = raw.n_times / 1000.
-        for procs_to_use in range(checked_min_procs, MAX_PROCS + 1):
-            for psd_band_t_start in range(GLOB_TMIN, GLOB_TMAX + 1, GLOB_TINCR):
-                if outer_time_bound < psd_band_t_start:
-                    # reg_print("{} < {} ; rejected".format(outer_time_bound, psd_band_t_start))
-                    break
 
-                # So, the point here is that we don't want to crash if the raw is malformed.
-                # However, just catching all ValueError's is really too permissive; we need to be more precise here.
-                num_res, freqs = mne.time_frequency.psd_welch(
-                                           n_jobs=procs_to_use,
-                                           inst=raw,
-                                           picks=mne.pick_types(raw.info, meg=True),
-                                           n_fft=NFFT,
-                                           n_overlap=NOVERLAP,
-                                           tmin=psd_band_t_start,
-                                           tmax=psd_band_t_start + GLOB_TINCR,
-                                           verbose="INFO"
-                                           )
+        ended_at_ms = None # Python 3 scope rules
 
-                num_res = 10.0 * np.log10(num_res)
+        lower_bound = GLOB_TMIN_s * 1000
+        increment = int(GLOB_TINCR_s * 1000)
+        # we ignore GLOB_TMAX_s if it's later than the end of the measure
+        delta = min(raw.n_times, GLOB_TMAX_s * 1000) - lower_bound
+        # The upper bound is the largest number of samples that allows for complete non overlapping PSD evaluation windows
+        # It's the total number of samples minus the rest of the division of the total number of samples by the PSD
+        # evaluation window width (the mod).
+        # If building something takes exactly 10 minutes, you have 45 minutes but only want full things to be built,
+        # then you will be done in
+        # 45 - 45 % 10 = 45 - 5 = 40 minutes
+        # if you start at 0h10,
+        # you will be done at
+        # 0h10 + 45 - 45 % 10 = 0h50 (this last part is pretty obvious)
+        upper_bound = lower_bound + delta - delta % int(GLOB_TINCR_s * 1000)
+        # previous upper bound : min(1000 * GLOB_TMAX_s, raw.n_times)
+        for psd_band_t_start_ms in range(lower_bound, upper_bound, increment):
+            """
+            So, GLOB_* are in seconds, and raw.n_times is in milliseconds.
+            Iterating on a range requires ints, and we don't want to lose precision by rounding up the milliseconds to seconds,
+            so we put everything in milliseconds.
 
-                if X[split_idx] is None:
-                    X[split_idx] = num_res
+            mne.time_frequency.psd_welch takes times in seconds, but accepts floats, so we divide by 1000 while
+            keeping our precision.
+            """
 
-                else:
-                    if num_res.shape[X_Dims.fft_ch.value] == X[split_idx].shape[X_Dims.fft_ch.value]: # All samples need the same qty of fft channels
-                        X[split_idx] = np.dstack([X[split_idx], num_res])
-                    else:
-                        print("num_res of bad shape '{}' rejected, should be {}".format(num_res.shape, X[split_idx].shape[:2]))
-                        continue
+            num_res_db, freqs = mne.time_frequency.psd_welch(
+                                       n_jobs=1, # in our tests, more jobs invariably resulted in slower execution, even on the 32 cores xeons of the Helios cluster.
+                                       inst=raw,
+                                       picks=mne.pick_types(raw.info, meg=True),
+                                       n_fft=NFFT,
+                                       n_overlap=NOVERLAP,
+                                       tmin=psd_band_t_start_ms / 1000.,
+                                       tmax=psd_band_t_start_ms / 1000. + GLOB_TINCR_s,
+                                       verbose="INFO"
+                                       )
+            if freqs_bands is None:
+                freqs_bands = freqs
+            else:
+                assert np.all(freqs_bands == freqs), "Frequency bands are supposed to be consistant across all samples.\n\nPreviously saved:\n\t{}\n\ngot:\n\t{}\n\n".format(freqs_bands, freqs)
 
-                Y[split_idx].append(label)
+            num_res_db = 10.0 * np.log10(num_res_db)
+
+            if X[split_idx] is None:
+                X[split_idx] = num_res_db
+            else:
+                assert num_res_db.shape[X_Dims.fft_ch.value] == X[split_idx].shape[X_Dims.fft_ch.value], "A sample has a weird shape. This shouldn't happen (anymore). This used to mean that we were trying to evaluate the PSD on a smaller window that the one we used on the previous units of the batch."
+                X[split_idx] = np.dstack([X[split_idx], num_res_db])
+
+            Y[split_idx].append(label)
+
 
     assert len(X) == 3
     assert len(Y) == 3
@@ -170,8 +197,7 @@ def maybe_prep_psds(args):
         X[i] = (X[i] - np.mean(X[i]))
         X[i] = X[i] / np.std(X[i])
 
-
-        assert len(X[i].shape) == X_Dims.size.value # meh
+        assert len(X[i].shape) == X_Dims.size.value
         assert X[i].shape[X_Dims.samples_and_times.value] == Y[i].shape[0], X[i].shape[X_Dims.samples_and_times.value]  # no_samples
         assert X[i].shape[X_Dims.sensors.value] == 306, X[i].shape[X_Dims.sensors.value]  # sensor no
 
