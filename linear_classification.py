@@ -137,7 +137,7 @@ class LogReg(AbstractTensorflowLinearClassifier):
 class FFNN(AbstractTensorflowLinearClassifier):
     def __init__(self, learning_rate, dropout_keep_prob, l2_c, input_ph_shape, output_ph_shape):
         self._type = "NN"
-        self._dropout_keep_prob = dropout_keep_pro
+        self._dropout_keep_prob = dropout_keep_prob
         no_of_hidden_units = 10
 
 
@@ -187,11 +187,11 @@ def linear_classification(linear_x, linear_y, job):
     test_y = linear_y[2]
 
     classifiers = []
+    job = "SKL_LR"
 
     if job == "LR":
         classifiers = [
                         LogReg(0.00001, [None, feature_width], [None, 2]),
-                        logistic.LogisticRegression(),
                        ]
 
     elif job == "NN":
@@ -202,8 +202,8 @@ def linear_classification(linear_x, linear_y, job):
     elif job == "SVM":
         # svm grid search
         for tol_exp in range(-15, -5, 1):
-            for c_exp in range(1, 5, 1):
-                classifiers.append(LinearSVC(tol=10.**tol_exp, C=10.**c_exp))
+            for C_exp in range(1, 5, 1):
+                classifiers.append(LinearSVC(tol=10.**tol_exp, C=10.**C_exp))
 
     elif job == "KNN":
         for metric in ["minkowski", "euclidean", "manhattan", "chebyshev", "wminkowski", "seuclidean", "mahalanobis"]:
@@ -214,10 +214,15 @@ def linear_classification(linear_x, linear_y, job):
         for rf_n_estimators_exp in range(0, 10):
             classifiers.append(RandomForestClassifier(n_estimators =2. ** rf_n_estimators_exp ))
 
-
-        """
+    elif job == "SKL_LR":
+        tol_const = 10.
+        C_const = 10.
+        for tol_exp in range(-15, -2, 1):
+            for C_exp in range(-5, 5, 1):
+                classifiers.append(logistic.LogisticRegression(max_iter=10000, verbos=10, tol=tol_const ** tol_exp, C=C_const ** C_exp))
 
     one_hot_set = {tflearn.DNN, LogReg, FFNN}
+
     for classifier in classifiers:
         if type(classifier) in one_hot_set:
             one_hot_y = [to_one_hot(_y, 2) for _y in linear_y]
@@ -241,6 +246,6 @@ def linear_classification(linear_x, linear_y, job):
                                                             vars(classifier).get("tol", "N/A")))
             print("training score:   {}".format(cl.score(training_x, training_y)))
             print("valid score:      {}".format(cl.score(valid_x, valid_y)))
-            """
+
 
 

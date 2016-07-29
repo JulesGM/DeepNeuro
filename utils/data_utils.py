@@ -164,6 +164,7 @@ def maybe_prep_psds(args):
                                        )
             if freqs_bands is None:
                 freqs_bands = freqs
+                print(freqs)
             else:
                 assert np.all(freqs_bands == freqs), "Frequency bands are supposed to be consistant across all samples.\n\nPreviously saved:\n\t{}\n\ngot:\n\t{}\n\n".format(freqs_bands, freqs)
 

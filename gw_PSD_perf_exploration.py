@@ -45,15 +45,15 @@ def main(argv):
     walltime = "10:00:00" # this is the max we are allowed
 
     #
-    tincr_constant = 2
-    tincr_min_exp = 3
-    tincr_max_exp = 3#3
+    tincr_constant = 10
+    tincr_min_exp = 1
+    tincr_max_exp = 1#3
     tincr_incr_exp = 1
 
 
-    nfft_constant = 3
-    nfft_min_exp = 2
-    nfft_max_exp = 2#3
+    nfft_constant = 10
+    nfft_min_exp = 1
+    nfft_max_exp = 1#3
     nfft_exp_incr = 1
 
     # Currently, novelap == 0
