@@ -1,5 +1,0 @@
-#! /bin/bash
-rsync ./* helios:"~/COCO/"
-ssh helios 'cd ~/COCO; cat essaie_etienne.sh ; msub essaie_etienne.sh ;
-'
-

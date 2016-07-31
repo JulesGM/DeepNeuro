@@ -15,12 +15,7 @@ from utils.data_utils import *
 import numpy as np
 import tensorflow as tf
 
-# Sklearn imports
-from sklearn.svm import SVC
-from sklearn.svm import LinearSVC
-from sklearn.linear_model import logistic
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
+from collections import Counter
 
 # MNE imports
 import mne, mne.time_frequency
@@ -32,7 +27,8 @@ from mne.channels.layout import _auto_topomap_coords
 import tflearn
 import h5py
 
-from utils import *
+import utils
+from utils.data_utils import SaverLoader
 
 def spatial_classification(interp_X, interp_Y, train_picks, valid_picks, test_picks):
     assert False, "This code is not functional"
@@ -94,10 +90,9 @@ def spatial_classification(interp_X, interp_Y, train_picks, valid_picks, test_pi
 
 
 
-def make_interpolated_data(X, res, method, sample_info, hdf5_save_path, sensor_type="grad", show=False):
+def make_interpolated_data(X, res, method, sample_info, sensor_type=True, show=False):
     picks = mne.pick_types(sample_info, meg=sensor_type)
     sensor_positions = _auto_topomap_coords(sample_info, picks, True)
-
 
     # Take any valid file's position information, as all raws [are supposed to] have the same positions
     import matplotlib.pyplot as plt
@@ -112,15 +107,14 @@ def make_interpolated_data(X, res, method, sample_info, hdf5_save_path, sensor_t
     grid_x, grid_y = np.meshgrid(np.linspace(min_x, max_x, res[0],), np.linspace(min_y, max_y, res[1]))
     grid = (grid_x, grid_y)
 
-    # FIRST DIM IS 1 IF SHOW IS ENABLED
+    interp_x = np.empty([X.shape[X_Dims.samples_and_times.value], X.shape[X_Dims.fft_ch.value], res[0], res[1]], dtype=np.float32)
 
-    BASE_PATH = os.path.dirname(__file__)
-    h5_file = h5py.File(os.path.join(BASE_PATH, "interpolated_data", "{}.h5".format(time.time())))
-    interp_x = h5_file.create_dataset("interpolated", shape=(1 if show else X.shape[X_Dims.samples_and_times.value], X.shape[X_Dims.fft_ch.value], res[0], res[1]), dtype=np.float32)
-
-    for i in xrange(X.shape[X_Dims.samples_and_times.value]):
-        for j in xrange(X.shape[X_Dims.fft_ch.value]):
-
+    i_bound = X.shape[X_Dims.samples_and_times.value]
+    j_bound = X.shape[X_Dims.fft_ch.value]
+    for i in xrange(i_bound):
+        if i % 5 == 0:
+            sys.stdout.write("\ri: {} of {} ({:4.2f} %))".format(i, i_bound, 100 * i / i_bound))
+        for j in xrange(j_bound):
             psd_image = griddata(sensor_positions[picks, :], X[i, j, picks], grid, method)
             interp_x[i, j, :] = psd_image[:, :]
 
@@ -128,5 +122,4 @@ def make_interpolated_data(X, res, method, sample_info, hdf5_save_path, sensor_t
                 plt.imshow(psd_image, interpolation="none")
                 plt.show()
 
-    h5_file.flush()
     return interp_x

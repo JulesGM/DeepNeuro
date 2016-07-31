@@ -22,6 +22,8 @@ exclude_list = [
                 "fif_split.json",
                 ".git/",
                 "*.json",
+                "latest_save.h5",
+                "*.pkl",
                 ]
 
 abs_exclude_set = {re.sub("/+", "/", "{}/{}".format(BASE_PATH, rel)) for rel in exclude_list}
@@ -32,7 +34,7 @@ include_set = set([BASE_PATH + "/"])
 # Doing everything we can to prevent having to do "shell=True"
 cmd = (["rsync",
         "--partial",
-#        "--progress",
+        "--progress",
         "-r",
         ]
           + list(include_set)

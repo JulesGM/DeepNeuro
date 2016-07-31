@@ -8,8 +8,6 @@ from six.moves import zip as izip
 # Stdlib imports
 import sys, os, argparse, time, logging, enum, json, subprocess as sp
 
-from utils.data_utils import *
-
 # scipy/numpy/matplotlib/tf
 import numpy as np
 import tensorflow as tf
@@ -187,7 +185,7 @@ def linear_classification(linear_x, linear_y, job):
     test_y = linear_y[2]
 
     classifiers = []
-    job = "SKL_LR"
+    job = "SVM"
 
     if job == "LR":
         classifiers = [
@@ -201,9 +199,10 @@ def linear_classification(linear_x, linear_y, job):
 
     elif job == "SVM":
         # svm grid search
-        for tol_exp in range(-15, -5, 1):
-            for C_exp in range(1, 5, 1):
-                classifiers.append(LinearSVC(tol=10.**tol_exp, C=10.**C_exp))
+        c_const = 2.0
+        for C_exp in range(-3, 0, 1):
+            print(C_exp)
+            classifiers.append(LinearSVC(C=c_const ** C_exp))
 
     elif job == "KNN":
         for metric in ["minkowski", "euclidean", "manhattan", "chebyshev", "wminkowski", "seuclidean", "mahalanobis"]:
@@ -219,7 +218,7 @@ def linear_classification(linear_x, linear_y, job):
         C_const = 10.
         for tol_exp in range(-15, -2, 1):
             for C_exp in range(-5, 5, 1):
-                classifiers.append(logistic.LogisticRegression(max_iter=10000, verbos=10, tol=tol_const ** tol_exp, C=C_const ** C_exp))
+                classifiers.append(logistic.LogisticRegression(max_iter=10000, verbose=10, tol=tol_const ** tol_exp, C=C_const ** C_exp))
 
     one_hot_set = {tflearn.DNN, LogReg, FFNN}
 
