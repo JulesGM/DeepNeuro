@@ -26,9 +26,9 @@ import h5py
 from utils import *
 
 
-def make_samples_linear(X, Y):
+def make_samples_linear(X):
     linear_X = X.reshape(X.shape[X_Dims.samples_and_times.value],  X.shape[X_Dims.fft_ch.value] * X.shape[X_Dims.sensors.value])
-    return linear_X, Y
+    return linear_X
 
 
 class AbstractTensorflowLinearClassifier(object):
@@ -49,13 +49,7 @@ class AbstractTensorflowLinearClassifier(object):
         training_x = linear_x[0]
         training_y = linear_y[0]
 
-        hdf5_file_name = "{}_{}.h5".format(self._type, time.time())
-        hdf5_path = os.path.join(os.path.dirname(__file__), "scores", hdf5_file_name)
-        output = h5py.File(hdf5_path, "a", libver='latest', compression=None)
-
         set_names = ["scores_training", "scores_valid"]
-        output.create_dataset(set_names[0], data=np.nan * np.ones((n_epoch,), np.float32))
-        output.create_dataset(set_names[1], data=np.nan * np.ones((n_epoch,), np.float32))
 
         with tf.Session() as s:
             s.run([tf.initialize_all_variables()])
@@ -101,80 +95,17 @@ class AbstractTensorflowLinearClassifier(object):
                         #print(label)
                         score = np.mean(label == decision)
                         set_name = set_names[set_id]
-                        output[set_name][i] = score
                         sys.stdout.write("{_type}::{epoch}::{set_name}: {score}\n".format(
                                 _type=self._type, set_name=set_name, epoch=i, score=score))
 
                         if i % 1000 == 0 and i != 0:
                             print("FLUSHING")
-                            output.flush()
                             sys.stdout.flush()
 
 
-class LogReg(AbstractTensorflowLinearClassifier):
-    def __init__(self, learning_rate, input_ph_shape, output_ph_shape):
-        self._type = "LR"
-
-        self.x_ph = tf.placeholder(dtype=tf.float32, shape=input_ph_shape)
-        self.y_ph = tf.placeholder(dtype=tf.float32, shape=output_ph_shape)
-
-        w0_s = (input_ph_shape[1], output_ph_shape[1])
-        b0_s = (output_ph_shape[1],)
-
-        self.w0 = tf.Variable(initial_value=tf.truncated_normal(w0_s), dtype=tf.float32)
-        self.b0 = tf.Variable(initial_value=tf.truncated_normal(b0_s), dtype=tf.float32)
-
-        self.classif = tf.nn.softmax(tf.matmul(self.x_ph, self.w0) + self.b0)
-        self.loss = tf.reduce_mean(- tf.reduce_sum(self.y_ph * tf.log(self.classif), reduction_indices=[1])) \
-                    + 0.6 * tf.nn.l2_loss(self.w0)
-
-        self.opt = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
-
-
-
-class FFNN(AbstractTensorflowLinearClassifier):
-    def __init__(self, learning_rate, dropout_keep_prob, l2_c, input_ph_shape, output_ph_shape):
-        self._type = "NN"
-        self._dropout_keep_prob = dropout_keep_prob
-        no_of_hidden_units = 10
-
-
-        self.x_ph = tf.placeholder(dtype=tf.float32, shape=input_ph_shape)
-        self.y_ph = tf.placeholder(dtype=tf.float32, shape=output_ph_shape)
-        self.dropout_keep_prob = tf.placeholder(dtype=tf.float32)
-
-        w0_s = (input_ph_shape[1], no_of_hidden_units)
-        b0_s = (w0_s[1],)
-        w1_s = (w0_s[1], output_ph_shape[1])
-        b1_s = (output_ph_shape[1],)
-
-        self.w0 = tf.Variable(initial_value=tf.truncated_normal(w0_s), dtype=tf.float32)
-        self.b0 = tf.Variable(initial_value=tf.truncated_normal(b0_s), dtype=tf.float32)
-        self.w1 = tf.Variable(initial_value=tf.truncated_normal(w1_s), dtype=tf.float32)
-        self.b1 = tf.Variable(initial_value=tf.truncated_normal(b1_s), dtype=tf.float32)
-
-        self.l0 =      tf.nn.softmax(tf.matmul(self.x_ph, self.w0) + self.b0)
-        self.d0 =      tf.nn.dropout(self.l0, self.dropout_keep_prob)
-        self.classif = tf.nn.softmax(tf.matmul(self.l0,   self.w1) + self.b1)
-        self.loss = tf.reduce_mean(- tf.reduce_sum(self.y_ph * tf.log(self.classif), reduction_indices=[1])) + \
-                    l2_c * tf.nn.l2_loss(self.w0) + l2_c * tf.nn.l2_loss(self.w1)
-
-        self.opt = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
-
-
-
 def linear_classification(linear_x, linear_y, job):
-    header = ("*********************************************************\n"
-              "**** Classification Code :                               \n"
-              "*********************************************************")
-    print(header)
-    sys.stderr.write(header + "\n")
-    sys.stderr.flush()
-
     assert len(linear_x) == 3
     assert len(linear_y) == 3
-
-    feature_width = linear_x[0].shape[1]
 
     training_x = linear_x[0]
     valid_x = linear_x[1]
@@ -187,22 +118,16 @@ def linear_classification(linear_x, linear_y, job):
     classifiers = []
     job = "SVM"
 
-    if job == "LR":
-        classifiers = [
-                        LogReg(0.00001, [None, feature_width], [None, 2]),
-                       ]
+    print("Creating the classifiers")
+    from NN import FFNN
 
-    elif job == "NN":
-        classifiers = [
-                        FFNN(0.0001, 1.0, 0.3, [None, feature_width], [None, 2]),
+    if job == "NN":
+        classifiers = [FFNN(linear_x[0].shape, 2, 2, 100)
                        ]
-
     elif job == "SVM":
-        # svm grid search
-        c_const = 2.0
-        for C_exp in range(-3, 0, 1):
-            print(C_exp)
-            classifiers.append(LinearSVC(C=c_const ** C_exp))
+        c_const = 10.
+        for c_exp in range(-10, 19, 2):
+            classifiers.append(SVC(C=c_const ** c_exp, kernel="linear", verbose=True, max_iter=1))
 
     elif job == "KNN":
         for metric in ["minkowski", "euclidean", "manhattan", "chebyshev", "wminkowski", "seuclidean", "mahalanobis"]:
@@ -216,35 +141,32 @@ def linear_classification(linear_x, linear_y, job):
     elif job == "SKL_LR":
         tol_const = 10.
         C_const = 10.
-        for tol_exp in range(-15, -2, 1):
-            for C_exp in range(-5, 5, 1):
+        for tol_exp in range(-5, -3, 1):
+            for C_exp in range(-5, 1, 1):
                 classifiers.append(logistic.LogisticRegression(max_iter=10000, verbose=10, tol=tol_const ** tol_exp, C=C_const ** C_exp))
 
-    one_hot_set = {tflearn.DNN, LogReg, FFNN}
-
+    print("--")
+    one_hot_set = {FFNN}
+    print("Linearly classifying")
     for classifier in classifiers:
         if type(classifier) in one_hot_set:
-            one_hot_y = [to_one_hot(_y, 2) for _y in linear_y]
-            classifier.fit(linear_x, one_hot_y, n_epoch=300000) #, validation_set=(features_va, labels_va))
-
-            if type(classifier) == tflearn.DNN:
-                predicted_valid_y = np.argmax(classifier.predict(valid_x), axis=1)
-                predicted_train_y = np.argmalx(classifier.predict(training_x), axis=1)
-
-                print("-------------------------------------")
-                print("classifier:     {}".format(classifier))
-                print("training score: {}".format(np.mean(predicted_train_y == one_hot_y[0])))
-                print("valid score:    {}".format(np.mean(predicted_valid_y == one_hot_y[1])))
-                print("-------------------------------------")
-
+            one_hot_y = [to_one_hot(_y, 2) for _y in linear_y[:2]]
+            # def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate):
+            classifier.fit(linear_x[0], one_hot_y[0], linear_x[1], one_hot_y[1], 1000000, 64, 0.01)
         else:
-            labels_tr = training_y
-            cl = classifier.fit(training_x, labels_tr)
-            print("-")
-            print("classifier:       {}".ljust(30, " ").format(classifier.__class__) + "   C={},  tol={}".format( vars(classifier).get("C", "N/A"),
-                                                            vars(classifier).get("tol", "N/A")))
-            print("training score:   {}".format(cl.score(training_x, training_y)))
-            print("valid score:      {}".format(cl.score(valid_x, valid_y)))
+            print("\t- Classifier:       {:30},   C={},  tol={}".format(
+                    classifier.__class__, vars(classifier).get("C", "N/A"), vars(classifier).get("tol", "N/A")))
 
+            print("\t- Fitting the model")
+            cl = classifier.fit(training_x, training_y)
+            assert cl is classifier
+            print("\t- Making predictions and calculating the accuracy scores")
+            preds_1 = cl.predict(valid_x)
+            print("\t- Training score:   {}".format(cl.score(training_x, training_y)))
+            print("\t- Valid score:      {}".format(cl.score(valid_x, valid_y)))
+            print("\t- valid avg:        {}".format(np.mean(preds_1)))
+            print("\t- classif obj:      {}".format(cl))
+
+            print("\t--")
 
 

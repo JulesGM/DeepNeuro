@@ -26,7 +26,7 @@ def weight_variable(shape, name=None):
 
 def softmax_layer(inpt, shape):
     fc_w = weight_variable(shape)
-    fc_b = tf.Variable(tf.zeros([shape[1]]))
+    fc_b = tf.Variable(tf.truncated_normal([shape[1]]))
 
     fc_h = tf.nn.softmax(tf.matmul(inpt, fc_w) + fc_b)
 
@@ -100,27 +100,29 @@ class AbstractClassifier(object):
                         feed_dict[self._dropout_keep_prob] = 1.0
                     preds_tr = sess.run([self.prediction], feed_dict=feed_dict)
 
-                    print("epoch {}:".format(epoch))
+                    print("NN: epoch {}:".format(epoch))
                     print("\t- Loss: {}".format(loss))
                     print("\t- Score va: {:2.4f}".format(np.average(preds_va == from_one_hot(valid_y))))
                     print("\t- Score tr: {:2.4f}".format(np.average(preds_tr == from_one_hot(train_y))))
+            print("--")
 
+class FFNN(AbstractClassifier):
+    def __init__(self, x_shape, y_shape_1, depth, width = 1024):
+        self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1]], name="x")
+        self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
+        self._lr = tf.placeholder(tf.float32, name="learning_rate")
 
-class ResNet(AbstractClassifier):
+        net = softmax_layer(self._x, [x_shape[1], width])
 
-    def __init__(self, x_shape, y_shape_1, depth):
+        for i in xrange(depth):
+            net = softmax_layer(net, [width, width])
 
-        self._x = tf.placeholder(tf.float32, shape=x_shape)
-        self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1])
-        self._lr = tf.placeholder(tf.float32)
+        w0 = tf.Variable(tf.truncated_normal([width, y_shape_1]))
+        b0 = tf.Variable(tf.truncated_normal([y_shape_1]))
+        a0 = tf.matmul(net, w0) + b0
 
-        net = residual_block(self._x, x_shape[3], True)
-        for i in range(depth):
-            net = residual_block(net)
-
-        self.score = softmax_layer(net, [None, y_shape_1])
-        self.loss = tf.reduce_mean(-self._y * tf.log(self.score))
+        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(a0, self._y))
         self.opt = tf.train.AdamOptimizer(self._lr).minimize(self.loss)
-        self.prediction = tf.argmax(self.score, 1)
-
+        self.score = tf.nn.softmax(a0)
+        self.prediction = tf.arg_max(self.score, 1)
 

@@ -47,10 +47,10 @@ def parse_args(argv):
 
 
 def main(argv):
-    start = time.time()
+
     BASE_PATH = os.path.dirname(__file__)
     argv = [None,
-            "--nfft",         "2000",
+            "--nfft",         "4",
             "--glob_tincr",   "10",
             "--data_path",    "/home/julesgm/aut_gamma/",
             ]
@@ -58,10 +58,9 @@ def main(argv):
     args = parse_args(argv)
 
     print("\nArgs:")
-    for k, v in iteritems(vars(args)):
-        print("\t- {:12}: {}".format(k, v))
-    print("")
-
+    for key, value in iteritems(vars(args)):
+        print("\t- {:12}: {}".format(key, value))
+    print("--")
     json_split_path = "./fif_split.json"
 
     if not os.path.exists(json_split_path):
@@ -70,37 +69,33 @@ def main(argv):
 
     X, Y, sample_info = utils.data_utils.maybe_prep_psds(args)
 
+    print("Dataset properties:")
     for i in xrange(3):
-        print("")
-        print("# {} has nan/inf:  {}".format(i, np.any(np.isnan(X[i]))))
-        print("# {} X shape:      {}".format(i, X[i].shape))
-        print("# {} X mean:       {}".format(i, np.mean(X[i])))
-        print("# {} X stddev:     {}".format(i, np.std(X[i])))
-        print("")
+        print("\t- {} nan/inf:    {}".format(i, np.any(np.isnan(X[i]))))
+        print("\t- {} shape:      {}".format(i, X[i].shape))
+        print("\t- {} mean:       {}".format(i, np.mean(X[i])))
+        print("\t- {} stddev:     {}".format(i, np.std(X[i])))
+        print("\t--")
+    print("--")
 
     ###########################################################################
     # CLASSICAL MACHINE LEARNING CLASSIFICATION without locality
     ###########################################################################
-    print("################################################################")
-    print("# CLASSICAL MACHINE LEARNING")
-    print("################################################################")
     linear_x = [None, None, None]
-    linear_Y = [None, None, None]
 
-    print("# Information about the linearized dataset")
-    names = ["training", "validation", "testing"]
     for i in xrange(3):
-        linear_x[i], linear_Y[i] = LC.make_samples_linear(X[i], Y[i])
-        print("#\tshape of linear_x {}: {}".format(names[i], linear_x[i].shape))
-        print("#\tstddev: {}\n#\tmean: {}".format(np.std(linear_x[i]), np.mean(linear_x[i])))
+        linear_x[i] = LC.make_samples_linear(X[i])
 
-    print("################################################################\n")
+    import sklearn.preprocessing
+    scaler = sklearn.preprocessing.StandardScaler()
+    linear_x[0] = scaler.fit_transform(linear_x[0])
+    linear_x[1] = scaler.transform(linear_x[1])
+    linear_x[2] = scaler.transform(linear_x[2])
 
-    LC.linear_classification(linear_x, linear_Y, args.job_type)
+    LC.linear_classification(linear_x, Y, args.job_type)
 
     return 0
 
-    interp_x = [None, None, None]
     res_x = 10
     res_y = 10
     interp = "cubic"
@@ -111,6 +106,7 @@ def main(argv):
     if saver_loader.save_exists():
         interp_x = saver_loader.load_ds()
     else:
+        interp_x = [None, None, None]
         for i in range(3):
             interp_x[i] = SC.make_interpolated_data(X[i], (res_x, res_y), interp, sample_info)
 
