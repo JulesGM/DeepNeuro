@@ -10,29 +10,28 @@ from utils import *
 mne.set_log_level("ERROR")
 
 import sklearn.preprocessing
+import joblib
+
+
 class SaverLoader(object):
     def __init__(self, path):
         self._save_path = path
+
     def save_ds(self, data):
-        import joblib
         joblib.dump(data, self._save_path)
 
     def load_ds(self):
-        import joblib
         return joblib.load(self._save_path)
 
     def save_exists(self):
         return os.path.exists(self._save_path)
 
 
-def data_gen(base_path, limit = None):
+def data_gen(base_path, limit=None):
     """
-
-    The objective is to never have exceptions, to always know what to ignore and why.
-
-    Test script:
-        to helios 1>/dev/null; ssh helios 'cd COCO; python -c "from data_utils import data_gen; [x for x in data_gen()]"'
-
+    Generator
+    Yields raw files
+        -- name, raw, label, len(full_glob)
     """
 
     base_path = os.path.abspath(base_path)
@@ -41,8 +40,6 @@ def data_gen(base_path, limit = None):
 
     if len(full_glob) == 0:
         raise RuntimeError("Datagen didn't find find any '.fif' files")
-
-    #print("glob found {} .fif files".format(len(full_glob)))
 
     if limit is not None:
         print(">>>>>>>>>> Warning: data_gen limit argument is not None.\n"
@@ -57,8 +54,9 @@ def data_gen(base_path, limit = None):
     failed = 0
     for fif_path in fif_paths:
         logging.info("Ignored ratio: {}" .format(failed / len(fif_paths)))
-        name = fif_path.split("/")[-1] # os.path.split appears broken somehow
+        name = fif_path.split("/")[-1]
 
+        # mne generates a lot of needless blabla
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             try:
@@ -74,7 +72,9 @@ def data_gen(base_path, limit = None):
                 logging.error("-- %s\n" % err)
                 raise err
 
-        assert name.lower().startswith("k") or name.lower().startswith("r"), "file name is weird, can't guess label from it. ({})".format(name)
+        assert name.lower().startswith("k") or name.lower().startswith("r"), \
+            "file name is weird, can't guess label from it. ({})".format(name)
+
         label = name.lower().startswith("k")
 
         yield name, raw, label, len(full_glob)
@@ -93,8 +93,8 @@ def maybe_prep_psds(args):
     X = [None, None, None] # Generated PSDs
     Y = [[], [], []] # Generated labels
 
-    BASE_PATH = os.path.dirname(os.path.dirname(__file__))
-    json_path = os.path.join(BASE_PATH, "fif_split.json")
+    base_path = os.path.dirname(os.path.dirname(__file__))
+    json_path = os.path.join(base_path, "fif_split.json")
 
     with open(json_path, "r") as json_f:
         fif_split = json.load(json_f) # dict with colors
@@ -107,13 +107,14 @@ def maybe_prep_psds(args):
     X = [None, None, None]
 
     # We build savepaths from different values of the parameters
-    saverLoader = SaverLoader("/home/julesgm/COCO/ds_transform_saves/{limit}_{tincr}_{nfft}_latest_save.pkl" \
-                              .format(limit=limit, tincr=args.glob_tincr, nfft=args.nfft))
+    saver_loader = SaverLoader("/home/julesgm/COCO/ds_transform_saves/{limit}_{tincr}_{nfft}_latest_save.pkl" \
+                                    .format(limit=limit, tincr=args.glob_tincr, nfft=args.nfft))
 
-    if saverLoader.save_exists():
+    if saver_loader.save_exists():
         print("Loading pickled dataset")
-        X, Y, info = saverLoader.load_ds()
+        X, Y, info = saver_loader.load_ds()
         print("--")
+
     else:
         print("Generating the dataset from the raw (.fif) files")
         freqs_bands = None
@@ -151,11 +152,13 @@ def maybe_prep_psds(args):
                 """
                 if j % 10 == 0:
                     sys.stdout.write("\r\t- File {} of {} (max: {}) - Segment {:7} of {:7}, {:<4.2f}%".format(
-                        i + 1, files_lim, total,
-                        str(psd_band_t_start_ms), str(upper_bound), 100 * psd_band_t_start_ms / upper_bound))
+                        i + 1, files_lim, total, str(psd_band_t_start_ms), str(upper_bound),
+                        100 * psd_band_t_start_ms / upper_bound))
 
+                # in our tests, more jobs invariably resulted in slower
+                # execution, even on the 32 cores xeons of the Helios cluster.
                 num_res_db, freqs = mne.time_frequency.psd_welch(
-                                           n_jobs=1, # in our tests, more jobs invariably resulted in slower execution, even on the 32 cores xeons of the Helios cluster.
+                                           n_jobs=1,
                                            inst=raw,
                                            picks=mne.pick_types(raw.info, meg=True),
                                            n_fft=args.nfft,
@@ -168,7 +171,8 @@ def maybe_prep_psds(args):
                 num_res_db = 10.0 * np.log10(num_res_db)
 
                 if not np.all(np.isfinite(num_res_db)):
-                    print("\n>>>>>>>>> {} : has a NAN or INF or NINF post log - skipping this segment ({}:{})\n".format(name, psd_band_t_start_ms, upper_bound))
+                    print("\n>>>>>>>>> {} : has a NAN or INF or NINF post log - skipping this segment ({}:{})\n" \
+                          .format(name, psd_band_t_start_ms, upper_bound))
 
                     continue
 
@@ -177,12 +181,11 @@ def maybe_prep_psds(args):
 
                 if freqs_bands is None:
                     freqs_bands = freqs
+
         print("")
         assert len(Y) == 3
-        #f = h5py.File("./latest_save.h5", "w")
 
         for i in xrange(3):
-
             X[i] = np.dstack(list_x[i])
             # We convert the PSD list of ndarrays to a single multidimensional ndarray
             X[i] = X[i].astype(np.float32)
@@ -203,7 +206,7 @@ def maybe_prep_psds(args):
         info = next(data_gen(args.data_path))[1].info
         print("--")
         print("Saving the newly generated dataset")
-        saverLoader.save_ds((X, Y, info))
+        saver_loader.save_ds((X, Y, info))
         print("--")
 
     for x in range(3):
