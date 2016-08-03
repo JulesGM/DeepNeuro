@@ -1,23 +1,15 @@
 #! /usr/bin/env python
-from __future__ import print_function, division, with_statement
+from __future__ import print_function, generators, division, with_statement
+from six import iteritems
+from six.moves import zip as izip, range as xrange
+
 import os, sys, re, glob, argparse, fnmatch
+
 import six
 import numpy as np
 import tensorflow as tf
-import sklearn.datasets as skld
 
-from collections import Counter
-
-def to_one_hot(arr, N = None):
-    if N is None:
-        N = np.max(arr) + 1
-
-    oh_arr = np.zeros((arr.shape[0], N))
-    oh_arr[np.arange(arr.shape[0]), arr] = 1
-    return oh_arr
-
-def from_one_hot(oh_arr):
-    return np.argmax(oh_arr, axis=1)
+import utils
 
 
 def weight_variable(shape, name=None):
@@ -49,28 +41,30 @@ def conv_layer(inpt, filter_shape, stride):
 
     return out
 
-def residual_block(inpt, output_depth, down_sample, projection=False):
-    input_depth = inpt.get_shape().as_list()[3]
+
+def residual_block(input, output_depth, down_sample, projection=False):
+    input_depth = input.get_shape().as_list()[3]
     if down_sample:
         filter_ = [1,2,2,1]
-        inpt = tf.nn.max_pool(inpt, ksize=filter_, strides=filter_, padding='SAME')
+        input = tf.nn.max_pool(input, ksize=filter_, strides=filter_, padding='SAME')
 
-    conv1 = conv_layer(inpt, [3, 3, input_depth, output_depth], 1)
+    conv1 = conv_layer(input, [3, 3, input_depth, output_depth], 1)
     conv2 = conv_layer(conv1, [3, 3, output_depth, output_depth], 1)
 
     if input_depth != output_depth:
         if projection:
             # Option B: Projection shortcut
-            input_layer = conv_layer(inpt, [1, 1, input_depth, output_depth], 2)
+            input_layer = conv_layer(input, [1, 1, input_depth, output_depth], 2)
         else:
             # Option A: Zero-padding
-            input_layer = tf.pad(inpt, [[0,0], [0,0], [0,0], [0, output_depth - input_depth]])
+            input_layer = tf.pad(input, [[0, 0], [0, 0], [0, 0], [0, output_depth - input_depth]])
     else:
-        input_layer = inpt
+        input_layer = input
 
     res = conv2 + input_layer
 
     return res
+
 
 class AbstractClassifier(object):
     def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate):
@@ -102,27 +96,7 @@ class AbstractClassifier(object):
 
                     print("NN: epoch {}:".format(epoch))
                     print("\t- Loss: {}".format(loss))
-                    print("\t- Score va: {:2.4f}".format(np.average(preds_va == from_one_hot(valid_y))))
-                    print("\t- Score tr: {:2.4f}".format(np.average(preds_tr == from_one_hot(train_y))))
+                    print("\t- Score va: {:2.4f}".format(np.average(preds_va == utils.from_one_hot(valid_y))))
+                    print("\t- Score tr: {:2.4f}".format(np.average(preds_tr == utils.from_one_hot(train_y))))
             print("--")
-
-class FFNN(AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, width = 1024):
-        self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1]], name="x")
-        self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
-        self._lr = tf.placeholder(tf.float32, name="learning_rate")
-
-        net = softmax_layer(self._x, [x_shape[1], width])
-
-        for i in xrange(depth):
-            net = softmax_layer(net, [width, width])
-
-        w0 = tf.Variable(tf.truncated_normal([width, y_shape_1]))
-        b0 = tf.Variable(tf.truncated_normal([y_shape_1]))
-        a0 = tf.matmul(net, w0) + b0
-
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(a0, self._y))
-        self.opt = tf.train.AdamOptimizer(self._lr).minimize(self.loss)
-        self.score = tf.nn.softmax(a0)
-        self.prediction = tf.arg_max(self.score, 1)
 

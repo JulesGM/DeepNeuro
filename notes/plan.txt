@@ -1,9 +1,0 @@
-# Plan #
-## Finish first iteration of feature extraction code ##
-    The features we plan to start with are small cuts of frequency space data over time, interpolated in 2D space between the sensors.
-
-    The neural net architecture will be a variation on the idea of lstms over convnets.
-
-    Concretely, we intend to experiment with different configurations of
-
-    The second thing we intend to fit is raw signal ove

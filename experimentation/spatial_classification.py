@@ -88,38 +88,3 @@ def spatial_classification(interp_X, interp_Y, train_picks, valid_picks, test_pi
         else:
             raise RuntimeError("Landed in a dead section")
 
-
-
-def make_interpolated_data(X, res, method, sample_info, sensor_type=True, show=False):
-    picks = mne.pick_types(sample_info, meg=sensor_type)
-    sensor_positions = _auto_topomap_coords(sample_info, picks, True)
-
-    # Take any valid file's position information, as all raws [are supposed to] have the same positions
-    import matplotlib.pyplot as plt
-    from scipy.interpolate import griddata
-
-    assert len(sensor_positions.shape) == 2 and sensor_positions.shape[1] == 2, sensor_positions.shape[1]
-    min_x = np.floor(np.min(sensor_positions[:, 0]))
-    max_x = np.ceil(np.max(sensor_positions[:, 0]))
-    min_y = np.floor(np.min(sensor_positions[:, 1]))
-    max_y = np.ceil(np.max(sensor_positions[:, 1]))
-
-    grid_x, grid_y = np.meshgrid(np.linspace(min_x, max_x, res[0],), np.linspace(min_y, max_y, res[1]))
-    grid = (grid_x, grid_y)
-
-    interp_x = np.empty([X.shape[X_Dims.samples_and_times.value], X.shape[X_Dims.fft_ch.value], res[0], res[1]], dtype=np.float32)
-
-    i_bound = X.shape[X_Dims.samples_and_times.value]
-    j_bound = X.shape[X_Dims.fft_ch.value]
-    for i in xrange(i_bound):
-        if i % 5 == 0:
-            sys.stdout.write("\ri: {} of {} ({:4.2f} %))".format(i, i_bound, 100 * i / i_bound))
-        for j in xrange(j_bound):
-            psd_image = griddata(sensor_positions[picks, :], X[i, j, picks], grid, method)
-            interp_x[i, j, :] = psd_image[:, :]
-
-            if show:
-                plt.imshow(psd_image, interpolation="none")
-                plt.show()
-
-    return interp_x
