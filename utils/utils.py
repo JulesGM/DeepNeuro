@@ -1,17 +1,12 @@
 from __future__ import print_function, division, with_statement
 
-from mne.io import Raw, Info
-from mne.io.pick import channel_type, channel_indices_by_type, pick_types
-from mne.channels.layout import _auto_topomap_coords
-from mne.channels.channels import _contains_ch_type
-import numpy as np
-
 import _ext_modules
 from _ext_modules import *
-#/usr/local/lib/python2.7/dist-packages/mne
 
 import enum
+
 class X_Dims(enum.Enum):
+    # Meh
     samples_and_times = 0
     fft_ch = 1
     sensors = 2
@@ -24,10 +19,8 @@ def to_one_hot(input, max_classes):
     output[np.arange(no_samples), input.astype(np.int32)] = 1
     return output
 
-
 def from_one_hot(values):
     return np.argmax(values, axis=1)
-
 
 def azim_proj(pos):
     """

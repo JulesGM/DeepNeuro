@@ -1,22 +1,23 @@
 #! /usr/bin/env python
 # Compatibility imports
 from __future__ import with_statement, print_function, division
-from six import iteritems
-from six.moves import zip as izip, range as xrange
+import six
+from six.moves import range as xrange
+from six.moves import zip as izip
 
 # stdlib usual imports
-import sys, os, argparse, time, logging, enum, json, subprocess as sp
-from collections import defaultdict as dd, Counter
-
-import utils.data_utils
+import sys
+import os
+import argparse
+import time
+import logging
+import warnings
 import utils
+import utils.data_utils
 
 import linear_classification as LC
-import spatial_classification as SC
 
 import numpy as np
-import tensorflow as tf
-
 
 """
 MNE's logger prints massive amount of useless stuff, and neither mne.set_logging_level(logging.ERROR) or
@@ -27,18 +28,13 @@ logger.disabled = True
 
 
 def parse_args(argv):
-    ###########################################################################
-    # ARGUMENT PARSING
-    ###########################################################################
-
-    # ARGUMENT PARSING
     p = argparse.ArgumentParser(argv)
     p.add_argument("--nfft",            type=int, default="6")
     p.add_argument("--glob_tincr",      type=int, default="10")
-    p.add_argument("--limit",           type=int, default=None)
-
-    p.add_argument("-o", "--data_path", type=str, default=os.path.join(os.environ["HOME"], "aut_gamma"))
     p.add_argument("--job_type",        type=str, default="NN")
+
+    p.add_argument("--limit",           type=int, default=None)
+    p.add_argument("-o", "--data_path", type=str, default=os.path.join(os.environ["HOME"], "aut_gamma"))
     p.add_argument("--noverlap",        type=int, default=0)
     p.add_argument("--glob_tmin",       type=int, default=0)
     p.add_argument("--glob_tmax",       type=int, default=1000000)
@@ -47,11 +43,13 @@ def parse_args(argv):
 
 
 def main(argv):
-    BASE_PATH = os.path.dirname(__file__)
     args = parse_args(argv)
 
+    if six.PY3:
+        print("The code hasn't been tested in Python 3.\n")
+
     print("\nArgs:")
-    for key, value in iteritems(vars(args)):
+    for key, value in six.iteritems(vars(args)):
         print("\t- {:12}: {}".format(key, value))
     print("--")
 
@@ -88,37 +86,6 @@ def main(argv):
 
     LC.linear_classification(linear_x, Y, args.job_type)
 
-    return 0
-
-    res_x = 10
-    res_y = 10
-    interp = "cubic"
-    saver_loader = utils.data_utils.SaverLoader("./interp_image_saves/{interp}_{resx}_{resy}_{limit}_{glob_tincr}_{nfft}_{name}_images.pkl" \
-                        .format(interp=interp, res_x=res_x, res_y=res_y, limit=args.limit,
-                                glob_tincr=args.glob_tincr, nfft=args.nfft, name="images"))
-
-    if saver_loader.save_exists():
-        interp_x = saver_loader.load_ds()
-    else:
-        interp_x = [None, None, None]
-        for i in xrange(3):
-            interp_x[i] = SC.make_interpolated_data(X[i], (res_x, res_y), interp, sample_info)
-
-        import custom_cells.tensorflow_resnet as tf_resnet
-        import custom_cells.tensorflow_resnet.resnet_train as tf_resnet_train
-
-        is_training = tf.placeholder('bool', [], name='is_training')
-
-        images, labels = tf.cond(is_training,
-                                 lambda: (interp_x[0], Y[0]),
-                                 lambda: (interp_x[1], Y[1]))
-
-        saver_loader.save_ds(interp_x)
-
-    logits = tf_resnet.inference_small(images, num_classes=2, is_training=is_training, use_bias=False, num_blocks=2)
-    tf_resnet_train.train(is_training, logits, images, labels)
-
-    #spatial_classification(interp_X, Y, training_picks, valid_picks, test_picks)
 
     ###########################################################################
     # LOCALITY PRESERVING CLASSICAL MACHINE LEARNING
@@ -137,10 +104,7 @@ def main(argv):
     # RESNET CONVOLUTIONAL NEURAL NETWORK
     ###########################################################################
 
-    # TODO
-    end = time.time()
-    print("TOTAL TIME: {total_time} sec".format(total_time=end - start))
-    print("*********************************************************\n"
-          "Total: '%s'" % (end - start))
+    # spatial_classification(interp_X, Y, training_picks, valid_picks, test_picks)
+
 
 if __name__ == "__main__": main(sys.argv)

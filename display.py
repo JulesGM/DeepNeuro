@@ -8,33 +8,37 @@ import sys, os, glob
 import h5py
 
 
-if len(sys.argv) <= 1:
-    if check_output(["hostname"]).startswith("helios"):
-        path = "/home/julesgm/COCO/scores"
+def main(argv):
+    if len(argv) <= 1:
+        if check_output(["hostname"]).startswith("helios"):
+            path = "/home/julesgm/COCO/scores"
+        else:
+            path = os.path.dirname(__file__) + "/scores/"
+
+        print(path)
+        os.chdir(path)
+        print(os.listdir(os.getcwd()))
+        files = glob.glob("*.h5")
+        name = sorted(files, key=lambda x: x.split("_")[-1])[-1]
+        name = os.path.abspath(name)
+
     else:
-        path = os.path.dirname(__file__) + "/scores/"
+        name = os.path.abspath(sys.argv[1])
 
-    print(path)
-    os.chdir(path)
-    print(os.listdir(os.getcwd()))
-    files = glob.glob("*.h5")
-    name = sorted(files, key=lambda x: x.split("_")[-1])[-1]
-    name = os.path.abspath(name)
+    print("\ntrying to open {}. Does it exist: {}\n".format(name, os.path.exists(name)))
 
-else:
-    name = os.path.abspath(sys.argv[1])
+    _file = h5py.File(name, "r")
 
-print("\ntrying to open {}. Does it exist: {}\n".format(name, os.path.exists(name)))
+    print(_file.keys())
 
-_file = h5py.File(name, "r")
+    scores_training = _file["scores_training"]
+    scores_valid = _file["scores_valid"]
 
-print(_file.keys())
+    plt.plot(np.arange(scores_training.shape[0]), scores_training)
+    plt.plot(np.arange(scores_valid.shape[0]), scores_valid)
+    fig = plt.gcf()
+    fig.canvas.set_window_title("display.py")
+    plt.show()
 
-scores_training = _file["scores_training"]
-scores_valid = _file["scores_valid"]
-
-plt.plot(np.arange(scores_training.shape[0]), scores_training)
-plt.plot(np.arange(scores_valid.shape[0]), scores_valid)
-fig = plt.gcf()
-fig.canvas.set_window_title("display.py")
-plt.show()
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

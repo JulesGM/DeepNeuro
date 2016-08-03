@@ -1,10 +1,6 @@
 from __future__ import division, print_function, with_statement
 range = xrange
-import matplotlib as mpl
 import tensorflow as tf
-
-import sys, os, re, fnmatch, subprocess as sp, argparse as ap, logging, threading
-from collections import defaultdict
 import mne
 mne.set_config("MNE_USE_CUDA", "true")
 mne.cuda.init_cuda()

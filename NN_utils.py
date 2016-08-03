@@ -1,11 +1,9 @@
-#! /usr/bin/env python
-from __future__ import print_function, generators, division, with_statement
-from six import iteritems
-from six.moves import zip as izip, range as xrange
-
-import os, sys, re, glob, argparse, fnmatch
-
+# Compatibility imports
+from __future__ import with_statement, print_function, division
 import six
+from six.moves import range as xrange
+from six.moves import zip as izip
+
 import numpy as np
 import tensorflow as tf
 
@@ -16,20 +14,22 @@ def weight_variable(shape, name=None):
     initial = tf.truncated_normal(shape, stddev=0.1)
     return tf.Variable(initial, name=name)
 
-def softmax_layer(inpt, shape):
+
+def softmax_layer(input_, shape):
     fc_w = weight_variable(shape)
     fc_b = tf.Variable(tf.truncated_normal([shape[1]]))
 
-    fc_h = tf.nn.softmax(tf.matmul(inpt, fc_w) + fc_b)
+    fc_h = tf.nn.softmax(tf.matmul(input_, fc_w) + fc_b)
 
     return fc_h
 
-def conv_layer(inpt, filter_shape, stride):
+
+def conv_layer(input_, filter_shape, stride):
     out_channels = filter_shape[3]
 
     filter_ = weight_variable(filter_shape)
-    conv = tf.nn.conv2d(inpt, filter=filter_, strides=[1, stride, stride, 1], padding="SAME")
-    mean, var = tf.nn.moments(conv, axes=[0,1,2])
+    conv = tf.nn.conv2d(input_, filter=filter_, strides=[1, stride, stride, 1], padding="SAME")
+    mean, var = tf.nn.moments(conv, axes=[0, 1, 2])
     beta = tf.Variable(tf.zeros([out_channels]), name="beta")
     gamma = weight_variable([out_channels], name="gamma")
 
@@ -42,24 +42,24 @@ def conv_layer(inpt, filter_shape, stride):
     return out
 
 
-def residual_block(input, output_depth, down_sample, projection=False):
-    input_depth = input.get_shape().as_list()[3]
+def residual_block(input_, output_depth, down_sample, projection=False):
+    input_depth = input_.get_shape().as_list()[3]
     if down_sample:
-        filter_ = [1,2,2,1]
-        input = tf.nn.max_pool(input, ksize=filter_, strides=filter_, padding='SAME')
+        filter_ = [1, 2, 2, 1]
+        input_ = tf.nn.max_pool(input_, ksize=filter_, strides=filter_, padding='SAME')
 
-    conv1 = conv_layer(input, [3, 3, input_depth, output_depth], 1)
+    conv1 = conv_layer(input_, [3, 3, input_depth, output_depth], 1)
     conv2 = conv_layer(conv1, [3, 3, output_depth, output_depth], 1)
 
     if input_depth != output_depth:
         if projection:
             # Option B: Projection shortcut
-            input_layer = conv_layer(input, [1, 1, input_depth, output_depth], 2)
+            input_layer = conv_layer(input_, [1, 1, input_depth, output_depth], 2)
         else:
             # Option A: Zero-padding
-            input_layer = tf.pad(input, [[0, 0], [0, 0], [0, 0], [0, output_depth - input_depth]])
+            input_layer = tf.pad(input_, [[0, 0], [0, 0], [0, 0], [0, output_depth - input_depth]])
     else:
-        input_layer = input
+        input_layer = input_
 
     res = conv2 + input_layer
 
@@ -70,8 +70,8 @@ class AbstractClassifier(object):
     def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate):
         with tf.Session() as sess:
             sess.run([tf.initialize_all_variables()])
-            for epoch in six.moves.range(n_epochs):
-                for start in range(0, train_x.shape[0], minibatch_size):
+            for epoch in xrange(n_epochs):
+                for start in xrange(0, train_x.shape[0], minibatch_size):
                     end = min(train_x.shape[0], start + minibatch_size)
 
                     feed_dict = {

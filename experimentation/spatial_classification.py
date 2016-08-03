@@ -18,7 +18,8 @@ import tensorflow as tf
 from collections import Counter
 
 # MNE imports
-import mne, mne.time_frequency
+import mne
+import mne.time_frequency
 from mne.decoding import CSP
 from mne.channels.layout import _auto_topomap_coords
 

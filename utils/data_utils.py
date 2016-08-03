@@ -1,16 +1,18 @@
 from __future__ import print_function, generators, division, with_statement
 from six import iteritems
-from six.moves import range as xrange
-import os, sys, re, glob, warnings, logging, enum, json
-import mne.io.pick
-import mne
-import numpy as np
-from utils import *
+from six.moves import zip as izip, range as xrange
 
+import os, sys, glob, warnings, logging, json
+import numpy as np
+
+import mne
+import mne.io.pick
+
+import utils
 
 mne.set_log_level("ERROR")
 
-import sklearn.preprocessing
+
 class SaverLoader(object):
     def __init__(self, path):
         self._save_path = path
@@ -138,8 +140,7 @@ def maybe_prep_psds(args):
             # 0h10 + 45 - 45 % 10 = 0h50 (this last part is pretty obvious)
             upper_bound = lower_bound + delta - delta % int(args.glob_tincr * 1000)
 
-
-            for j, psd_band_t_start_ms in enumerate(range(lower_bound, upper_bound, increment)):
+            for j, psd_band_t_start_ms in enumerate(xrange(lower_bound, upper_bound, increment)):
                 """
                 So, GLOB_* are in seconds, and raw.n_times is in milliseconds.
                 Iterating on a range requires ints, and we don't want to lose precision by rounding up the milliseconds to seconds,
@@ -190,9 +191,9 @@ def maybe_prep_psds(args):
             # Transpose for convenience
             X[i] = X[i].T
 
-            assert len(X[i].shape) == X_Dims.size.value
-            assert X[i].shape[X_Dims.samples_and_times.value] == Y[i].shape[0], X[i].shape[X_Dims.samples_and_times.value]  # no_samples
-            assert X[i].shape[X_Dims.sensors.value] == 306, X[i].shape[X_Dims.sensors.value]  # sensor no
+            assert len(X[i].shape) == utils.X_Dims.size.value
+            assert X[i].shape[utils.X_Dims.samples_and_times.value] == Y[i].shape[0], X[i].shape[utils.X_Dims.samples_and_times.value]  # no_samples
+            assert X[i].shape[utils.X_Dims.sensors.value] == 306, X[i].shape[utils.X_Dims.sensors.value]  # sensor no
 
         # Verify that all values are good
         for i in xrange(3):

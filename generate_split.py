@@ -1,14 +1,16 @@
 from __future__ import division, print_function, with_statement
 from six.moves import xrange
 from six import iteritems
-import os, sys, random, json
-import numpy as np
 
+import os
+import sys
+import random
+import json
+import numpy as np
+import utils.data_utils
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.data_utils import *
 
-from collections import defaultdict
 
 def main(argv):
     """
@@ -18,11 +20,11 @@ def main(argv):
 
     print("Generating data split json file")
 
-    DATA_PATH = argv[1]
-    BASE_PATH = argv[2] if len(argv) > 2 else os.path.dirname(__file__)
+    data_path = argv[1]
+    base_path = argv[2] if len(argv) > 2 else os.path.dirname(__file__)
 
     by_labels = [[], []] # The labels are of value either True or False
-    for name, raw, label, total in data_gen(DATA_PATH):
+    for name, raw, label, total in utils.data_utils.data_gen(data_path):
         by_labels[int(label)].append(name)
 
     print("")
@@ -46,7 +48,6 @@ def main(argv):
     test_split_c1 = max(test_r_c1, 1)
 
     split = {}
-
     split["training"] = by_labels[0][valid_split_c0 + test_split_c0:]               + by_labels[1][valid_split_c1 + test_split_c1:]
     split["valid"]    = by_labels[0][:valid_split_c0]                               + by_labels[1][:valid_split_c1]
     split["test"]     = by_labels[0][valid_split_c0:valid_split_c0 + test_split_c0] + by_labels[1][valid_split_c1:valid_split_c1 + test_split_c1]
@@ -62,11 +63,13 @@ def main(argv):
             assert name not in res, "we should never be trying to add a name that's already in the dict"
             res[name] = k
 
-    json_path = os.path.join(BASE_PATH, "fif_split.json")
+    json_path = os.path.join(base_path, "fif_split.json")
 
     with open(json_path, "w") as of:
         json.dump(res, of)
 
     print("--")
+
+    return 0
 
 if __name__ == "__main__": sys.exit(main(sys.argv))
