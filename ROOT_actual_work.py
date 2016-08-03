@@ -47,7 +47,6 @@ def parse_args(argv):
 
 
 def main(argv):
-
     BASE_PATH = os.path.dirname(__file__)
     args = parse_args(argv)
 
@@ -55,11 +54,12 @@ def main(argv):
     for key, value in iteritems(vars(args)):
         print("\t- {:12}: {}".format(key, value))
     print("--")
+
     json_split_path = "./fif_split.json"
 
     if not os.path.exists(json_split_path):
-        import generate_split
-        generate_split.main([None, args.data_path, BASE_PATH])
+        raise RuntimeError("Couldn't find fif_split.json. Should be generated with ./generate_split.py at the beginning"
+                           " of the data exploration, and then shared.")
 
     X, Y, sample_info = utils.data_utils.maybe_prep_psds(args)
 
