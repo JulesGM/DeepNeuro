@@ -6,30 +6,33 @@ import mne.io.pick
 import mne
 import numpy as np
 from utils import *
-import joblib
-import sklearn.preprocessing
+
 
 mne.set_log_level("ERROR")
 
-
+import sklearn.preprocessing
 class SaverLoader(object):
     def __init__(self, path):
         self._save_path = path
-
     def save_ds(self, data):
+        import joblib
         joblib.dump(data, self._save_path)
 
     def load_ds(self):
+        import joblib
         return joblib.load(self._save_path)
 
     def save_exists(self):
         return os.path.exists(self._save_path)
 
 
-def data_gen(base_path, limit=None):
+def data_gen(base_path, limit = None):
     """
-    Loads the ".fif" into mne.io.Raw objects, as a generator
+    Generator
+    Yields raw files
+        -- name, raw, label, len(full_glob)
     """
+
     base_path = os.path.abspath(base_path)
     assert os.path.exists(base_path), "{base_path} doesn't exist".format(base_path=base_path)
     full_glob = glob.glob(base_path + "/*.fif")
@@ -52,6 +55,9 @@ def data_gen(base_path, limit=None):
         logging.info("Ignored ratio: {}" .format(failed / len(fif_paths)))
         name = fif_path.split("/")[-1] # os.path.split appears broken somehow
 
+        # MNE generates a lot of really unnecessary blabla.
+        # We realize hiding warnings is far from ideal; we might look into fixing this
+        # later on.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             try:
@@ -67,14 +73,15 @@ def data_gen(base_path, limit=None):
                 logging.error("-- %s\n" % err)
                 raise err
 
-        assert name.lower().startswith("k") or name.lower().startswith("r"), "file name is weird, can't guess label from it. ({})".format(name)
+        assert name.lower().startswith("k") or name.lower().startswith("r"), \
+            "file name is weird, can't guess label from it. ({})".format(name)
+
         label = name.lower().startswith("k")
 
         yield name, raw, label, len(full_glob)
 
 
 def maybe_prep_psds(args):
-
     if args.glob_tmin != 0:
         print("Warning: --glob_tmin is not equal to zero, this is weid. Value : {}".format(args.glob_tmin))
 
@@ -97,6 +104,8 @@ def maybe_prep_psds(args):
                          }
 
     X = [None, None, None]
+
+    # We build savepaths from different values of the parameters
     saver_loader = SaverLoader("/home/julesgm/COCO/ds_transform_saves/{limit}_{tincr}_{nfft}_latest_save.pkl" \
                               .format(limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft))
 
@@ -129,6 +138,7 @@ def maybe_prep_psds(args):
             # 0h10 + 45 - 45 % 10 = 0h50 (this last part is pretty obvious)
             upper_bound = lower_bound + delta - delta % int(args.glob_tincr * 1000)
 
+
             for j, psd_band_t_start_ms in enumerate(range(lower_bound, upper_bound, increment)):
                 """
                 So, GLOB_* are in seconds, and raw.n_times is in milliseconds.
@@ -157,7 +167,8 @@ def maybe_prep_psds(args):
                 num_res_db = 10.0 * np.log10(num_res_db)
 
                 if not np.all(np.isfinite(num_res_db)):
-                    print("\n>>>>>>>>> {} : has a NAN or INF or NINF post log - skipping this segment ({}:{})\n".format(name, psd_band_t_start_ms, upper_bound))
+                    print("\n>>>>>>>>> {} : has a NAN or INF or NINF post log - skipping this segment ({}:{})\n" \
+                          .format(name, psd_band_t_start_ms, upper_bound))
 
                     continue
 
@@ -169,8 +180,8 @@ def maybe_prep_psds(args):
         print("")
         assert len(Y) == 3
 
-        for i in xrange(3):
 
+        for i in xrange(3):
             X[i] = np.dstack(list_x[i])
             # We convert the PSD list of ndarrays to a single multidimensional ndarray
             X[i] = X[i].astype(np.float32)
