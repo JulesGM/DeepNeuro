@@ -2,7 +2,7 @@
 # Compatibility imports
 from __future__ import with_statement, print_function, division
 from six import iteritems
-from six.moves import zip as izip
+from six.moves import zip as izip, range as xrange
 
 # stdlib usual imports
 import sys, os, argparse, time, logging, enum, json, subprocess as sp
@@ -33,11 +33,11 @@ def parse_args(argv):
 
     # ARGUMENT PARSING
     p = argparse.ArgumentParser(argv)
-    p.add_argument("--nfft",            type=int,)
-    p.add_argument("--glob_tincr",      type=int,)
+    p.add_argument("--nfft",            type=int, default="6")
+    p.add_argument("--glob_tincr",      type=int, default="10")
     p.add_argument("--limit",           type=int, default=None)
-    p.add_argument("-o", "--data_path", type=str,)
 
+    p.add_argument("-o", "--data_path", type=str, default=os.path.join(os.environ["HOME"], "aut_gamma"))
     p.add_argument("--job_type",        type=str, default="NN")
     p.add_argument("--noverlap",        type=int, default=0)
     p.add_argument("--glob_tmin",       type=int, default=0)
@@ -49,12 +49,6 @@ def parse_args(argv):
 def main(argv):
 
     BASE_PATH = os.path.dirname(__file__)
-    argv = [None,
-            "--nfft",         "4",
-            "--glob_tincr",   "10",
-            "--data_path",    "/home/julesgm/aut_gamma/",
-            ]
-
     args = parse_args(argv)
 
     print("\nArgs:")
@@ -107,7 +101,7 @@ def main(argv):
         interp_x = saver_loader.load_ds()
     else:
         interp_x = [None, None, None]
-        for i in range(3):
+        for i in xrange(3):
             interp_x[i] = SC.make_interpolated_data(X[i], (res_x, res_y), interp, sample_info)
 
         import custom_cells.tensorflow_resnet as tf_resnet

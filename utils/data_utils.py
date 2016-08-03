@@ -1,48 +1,41 @@
 from __future__ import print_function, generators, division, with_statement
 from six import iteritems
+from six.moves import range as xrange
 import os, sys, re, glob, warnings, logging, enum, json
 import mne.io.pick
 import mne
 import numpy as np
 from utils import *
-
+import joblib
+import sklearn.preprocessing
 
 mne.set_log_level("ERROR")
 
-import sklearn.preprocessing
+
 class SaverLoader(object):
     def __init__(self, path):
         self._save_path = path
+
     def save_ds(self, data):
-        import joblib
         joblib.dump(data, self._save_path)
 
     def load_ds(self):
-        import joblib
         return joblib.load(self._save_path)
 
     def save_exists(self):
         return os.path.exists(self._save_path)
 
 
-def data_gen(base_path, limit = None):
+def data_gen(base_path, limit=None):
     """
-
-    The objective is to never have exceptions, to always know what to ignore and why.
-
-    Test script:
-        to helios 1>/dev/null; ssh helios 'cd COCO; python -c "from data_utils import data_gen; [x for x in data_gen()]"'
-
+    Loads the ".fif" into mne.io.Raw objects, as a generator
     """
-
     base_path = os.path.abspath(base_path)
     assert os.path.exists(base_path), "{base_path} doesn't exist".format(base_path=base_path)
     full_glob = glob.glob(base_path + "/*.fif")
 
     if len(full_glob) == 0:
         raise RuntimeError("Datagen didn't find find any '.fif' files")
-
-    #print("glob found {} .fif files".format(len(full_glob)))
 
     if limit is not None:
         print(">>>>>>>>>> Warning: data_gen limit argument is not None.\n"
@@ -63,12 +56,12 @@ def data_gen(base_path, limit = None):
             warnings.simplefilter("ignore")
             try:
                 raw = mne.io.Raw(fif_path)
-            except ValueError, err:
+            except ValueError as err:
                 logging.error("-- data_gen ValueError:")
                 logging.error("-- %s" % name)
                 logging.error("-- %s\n" % err)
                 raise err
-            except TypeError, err:
+            except TypeError as err:
                 logging.error("-- data_gen TypeError")
                 logging.error("-- %s" % name)
                 logging.error("-- %s\n" % err)
@@ -81,7 +74,6 @@ def data_gen(base_path, limit = None):
 
 
 def maybe_prep_psds(args):
-    limit = args.limit
 
     if args.glob_tmin != 0:
         print("Warning: --glob_tmin is not equal to zero, this is weid. Value : {}".format(args.glob_tmin))
@@ -93,8 +85,8 @@ def maybe_prep_psds(args):
     X = [None, None, None] # Generated PSDs
     Y = [[], [], []] # Generated labels
 
-    BASE_PATH = os.path.dirname(os.path.dirname(__file__))
-    json_path = os.path.join(BASE_PATH, "fif_split.json")
+    base_path = os.path.dirname(os.path.dirname(__file__))
+    json_path = os.path.join(base_path, "fif_split.json")
 
     with open(json_path, "r") as json_f:
         fif_split = json.load(json_f) # dict with colors
@@ -105,22 +97,20 @@ def maybe_prep_psds(args):
                          }
 
     X = [None, None, None]
+    saver_loader = SaverLoader("/home/julesgm/COCO/ds_transform_saves/{limit}_{tincr}_{nfft}_latest_save.pkl" \
+                              .format(limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft))
 
-    # We build savepaths from different values of the parameters
-    saverLoader = SaverLoader("/home/julesgm/COCO/ds_transform_saves/{limit}_{tincr}_{nfft}_latest_save.pkl" \
-                              .format(limit=limit, tincr=args.glob_tincr, nfft=args.nfft))
-
-    if saverLoader.save_exists():
+    if saver_loader.save_exists():
         print("Loading pickled dataset")
-        X, Y, info = saverLoader.load_ds()
+        X, Y, info = saver_loader.load_ds()
         print("--")
     else:
         print("Generating the dataset from the raw (.fif) files")
         freqs_bands = None
         list_x = [[], [], []]
 
-        for i, (name, raw, label, total) in enumerate(data_gen(args.data_path, limit)):
-            files_lim = total if limit is None or total > limit else limit
+        for i, (name, raw, label, total) in enumerate(data_gen(args.data_path, args.limit)):
+            files_lim = total if args.limit is None or total > args.limit else args.limit
 
             split_idx = split_idx_to_name[fif_split[name]]
 
@@ -138,7 +128,6 @@ def maybe_prep_psds(args):
             # you will be done at
             # 0h10 + 45 - 45 % 10 = 0h50 (this last part is pretty obvious)
             upper_bound = lower_bound + delta - delta % int(args.glob_tincr * 1000)
-            # previous upper bound : min(1000 * GLOB_TMAX_s, raw.n_times)
 
             for j, psd_band_t_start_ms in enumerate(range(lower_bound, upper_bound, increment)):
                 """
@@ -179,7 +168,6 @@ def maybe_prep_psds(args):
                     freqs_bands = freqs
         print("")
         assert len(Y) == 3
-        #f = h5py.File("./latest_save.h5", "w")
 
         for i in xrange(3):
 
@@ -196,17 +184,17 @@ def maybe_prep_psds(args):
             assert X[i].shape[X_Dims.sensors.value] == 306, X[i].shape[X_Dims.sensors.value]  # sensor no
 
         # Verify that all values are good
-        for i in range(3):
+        for i in xrange(3):
             assert np.all(np.isfinite(X[i]))
 
         # Take any valid file's position information, as all raws [are supposed to] have the same positions
         info = next(data_gen(args.data_path))[1].info
         print("--")
         print("Saving the newly generated dataset")
-        saverLoader.save_ds((X, Y, info))
+        saver_loader.save_ds((X, Y, info))
         print("--")
 
-    for x in range(3):
+    for x in xrange(3):
         print(Y[x][:])
 
     return X, Y, info
