@@ -20,7 +20,7 @@ import custom_cells.tensorflow_resnet.resnet_train as tf_resnet_train
 
 
 class FFNN(NN_utils.AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, width_hidden_layers=64, dropout_keep_prob=0.25, l2_c=0.1):
+    def __init__(self, x_shape, y_shape_1, depth, width_hidden_layers=64, dropout_keep_prob=0.25, l2_c=1):
         self.dropout_keep_prob = dropout_keep_prob
 
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1]], name="x")
@@ -30,20 +30,23 @@ class FFNN(NN_utils.AbstractClassifier):
 
 
         w_list = []
-        net = NN_utils.softmax_layer(self._x, [x_shape[1], width_hidden_layers])
+        net, (w, b)  = NN_utils.softmax_layer(self._x, [x_shape[1], width_hidden_layers])
+        w_list.append(w)
 
         for i in xrange(depth):
             net, (w, b) = NN_utils.softmax_layer(net, [width_hidden_layers, width_hidden_layers])
-            w_list.append((w, b))
             net = tf.nn.dropout(net, self._dropout_keep_prob)
+            w_list.append(w)
 
         w0 = tf.Variable(tf.truncated_normal([width_hidden_layers, y_shape_1]))
         b0 = tf.Variable(tf.truncated_normal([y_shape_1]))
         a0 = tf.matmul(net, w0) + b0
 
-        l2 = [tf.nn.l2_loss(x) for x in w_list]
-        l2.append(tf.nn.l2_loss(w0))
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(a0, self._y)) + l2_c * sum(l2)
+        w_list.append(w0)
+
+        squares = sum([tf.reduce_sum(tf.matmul(x, tf.transpose(x))) for x in w_list])
+        l2 = l2_c * squares
+        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(a0, self._y)) + l2
         self.opt = tf.train.AdamOptimizer(self._lr).minimize(self.loss)
         self.score = tf.nn.softmax(a0)
         self.prediction = tf.arg_max(self.score, 1)

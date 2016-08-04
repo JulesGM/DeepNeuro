@@ -40,7 +40,7 @@ def linear_classification(linear_x, linear_y, job):
     print("Creating the classifiers")
 
     if job == "NN":
-        classifiers = [NN_models.FFNN(linear_x[0].shape, 2, 1, 12, 0.5, 0.01)
+        classifiers = [NN_models.FFNN(linear_x[0].shape, 2, 1, 12, 0.5, 15)
                        ]
     elif job == "SVM":
         c_const = 10.
