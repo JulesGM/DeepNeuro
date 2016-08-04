@@ -17,6 +17,7 @@ import utils.data_utils
 
 import linear_classification as LC
 
+import sklearn.preprocessing
 import numpy as np
 
 """
@@ -29,8 +30,8 @@ logger.disabled = True
 
 def parse_args(argv):
     p = argparse.ArgumentParser(argv)
-    p.add_argument("--nfft",            type=int, default="6")
-    p.add_argument("--glob_tincr",      type=int, default="10")
+    p.add_argument("--nfft",            type=int, default="5")
+    p.add_argument("--glob_tincr",      type=float, default="0.1")
     p.add_argument("--job_type",        type=str, default="NN")
 
     p.add_argument("--limit",           type=int, default=None)
@@ -78,14 +79,12 @@ def main(argv):
     for i in xrange(3):
         linear_x[i] = LC.make_samples_linear(X[i])
 
-    import sklearn.preprocessing
     scaler = sklearn.preprocessing.StandardScaler()
     linear_x[0] = scaler.fit_transform(linear_x[0])
     linear_x[1] = scaler.transform(linear_x[1])
     linear_x[2] = scaler.transform(linear_x[2])
 
     LC.linear_classification(linear_x, Y, args.job_type)
-
 
     ###########################################################################
     # LOCALITY PRESERVING CLASSICAL MACHINE LEARNING
@@ -97,8 +96,6 @@ def main(argv):
 
     # 3x3 conv, relu, 3x3 conv, relu, 3x3 conv, relu, maxpool, 3x3 conv, relu, 3x3 conv, relu, maxpool, FC, FC
     # with batchnorm and dropout
-
-    # TODO
 
     ###########################################################################
     # RESNET CONVOLUTIONAL NEURAL NETWORK

@@ -11,7 +11,7 @@ import utils
 
 
 def weight_variable(shape, name=None):
-    initial = tf.truncated_normal(shape, stddev=0.1)
+    initial = tf.truncated_normal(shape, stddev=0.5)
     return tf.Variable(initial, name=name)
 
 
@@ -21,7 +21,7 @@ def softmax_layer(input_, shape):
 
     fc_h = tf.nn.softmax(tf.matmul(input_, fc_w) + fc_b)
 
-    return fc_h
+    return fc_h, (fc_w, fc_b)
 
 
 def conv_layer(input_, filter_shape, stride):
@@ -44,6 +44,7 @@ def conv_layer(input_, filter_shape, stride):
 
 def residual_block(input_, output_depth, down_sample, projection=False):
     input_depth = input_.get_shape().as_list()[3]
+
     if down_sample:
         filter_ = [1, 2, 2, 1]
         input_ = tf.nn.max_pool(input_, ksize=filter_, strides=filter_, padding='SAME')
@@ -79,24 +80,25 @@ class AbstractClassifier(object):
                         self._y: train_y[start:end],
                         self._lr: learning_rate,
                     }
+
                     if "_dropout_keep_prob" in vars(self):
                         feed_dict[self._dropout_keep_prob] = self.dropout_keep_prob
                     opt, loss = sess.run([self.opt, self.loss], feed_dict=feed_dict)
 
-                if epoch % 500 == 0 and epoch != 0:
+                if epoch % 1 == 0 and epoch != 0:
                     feed_dict = {self._x: valid_x[:, :], }
                     if "_dropout_keep_prob" in vars(self):
                         feed_dict[self._dropout_keep_prob] = 1.0
-                    preds_va = sess.run([self.prediction], feed_dict=feed_dict)
+                    preds_valid = sess.run([self.prediction], feed_dict=feed_dict)
 
                     feed_dict = {self._x: train_x[:, :], }
                     if "_dropout_keep_prob" in vars(self):
                         feed_dict[self._dropout_keep_prob] = 1.0
-                    preds_tr = sess.run([self.prediction], feed_dict=feed_dict)
+                    preds_train = sess.run([self.prediction], feed_dict=feed_dict)
 
                     print("NN: epoch {}:".format(epoch))
                     print("\t- Loss: {}".format(loss))
-                    print("\t- Score va: {:2.4f}".format(np.average(preds_va == utils.from_one_hot(valid_y))))
-                    print("\t- Score tr: {:2.4f}".format(np.average(preds_tr == utils.from_one_hot(train_y))))
+                    print("\t- Score va: {:2.4f}".format(np.average(preds_valid == utils.from_one_hot(valid_y))))
+                    print("\t- Score tr: {:2.4f}".format(np.average(preds_train == utils.from_one_hot(train_y))))
             print("--")
 

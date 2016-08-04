@@ -42,7 +42,7 @@ fi
 
 
 echo  -e "${LB}<generating requirements.txt with sfood>${C_reset}\n"
-sfood ~/COCO/ -e 2>/dev/null | sfood-essence 2>/dev/null | tee requirements.txt | sed 's/^/\t/'
+sfood ~/COCO/ -e 2>/dev/null | requirements_generator 2>/dev/null | tee requirements.txt | sed 's/^/\t/'
 echo -e "\n$LB</generating requirements.txt with sfood>$C_reset"
 echo -e "$LB<to::rsync>$C_reset\n"
 to $TARGET | sed 's/^/\t/'

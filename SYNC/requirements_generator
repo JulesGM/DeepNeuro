@@ -11,10 +11,15 @@ from snakefood.filter import do_filter
 # and need to be installed "by hand"
 ignore_set = {"numpy",
               "tensorflow",
+              "scipy"
               }
 # Modules that have different repo names from their module names. Probably surprisingly, not that common.
-replace_dict = {"enum": "enum34"
+replace_dict = {"enum": "enum34",
+                "skimage": "scikit-image",
+                "sklearn": "scikit-learn"
                 }
+
+
 
 modules_to_add = set()
 

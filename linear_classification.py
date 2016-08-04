@@ -40,7 +40,7 @@ def linear_classification(linear_x, linear_y, job):
     print("Creating the classifiers")
 
     if job == "NN":
-        classifiers = [NN_models.FFNN(linear_x[0].shape, 2, 1, 20,)
+        classifiers = [NN_models.FFNN(linear_x[0].shape, 2, 1, 12,)
                        ]
     elif job == "SVM":
         c_const = 10.
@@ -60,9 +60,9 @@ def linear_classification(linear_x, linear_y, job):
         tol_const = 10.
         c_const = 10.
         for tol_exp in xrange(-5, -3, 1):
-            for C_exp in xrange(-5, 1, 1):
+            for c_exp in xrange(-5, 1, 1):
                 classifiers.append(logistic.LogisticRegression(max_iter=10000, verbose=10, tol=tol_const ** tol_exp,
-                                                               C=c_const ** C_exp))
+                                                               C=c_const ** c_exp))
 
     print("--")
     one_hot_set = {NN_models.FFNN}
@@ -71,7 +71,8 @@ def linear_classification(linear_x, linear_y, job):
     for classifier in classifiers:
         if type(classifier) in one_hot_set:
             one_hot_y = [utils.to_one_hot(_y, 2) for _y in linear_y[:2]]
-            classifier.fit(linear_x[0], one_hot_y[0], linear_x[1], one_hot_y[1], 1000000, 64, 0.01)
+            classifier.fit(linear_x[0], one_hot_y[0], linear_x[1], one_hot_y[1], 1000000, 64, 0.001)
+
         else:
             print("\t- Classifier:       {:30},   C={},  tol={}".format(
                     classifier.__class__, vars(classifier).get("C", "N/A"), vars(classifier).get("tol", "N/A")))

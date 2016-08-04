@@ -20,7 +20,7 @@ import custom_cells.tensorflow_resnet.resnet_train as tf_resnet_train
 
 
 class FFNN(NN_utils.AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, width_hidden_layers=64, dropout_keep_prob=0.5):
+    def __init__(self, x_shape, y_shape_1, depth, width_hidden_layers=64, dropout_keep_prob=0.25):
         self.dropout_keep_prob = dropout_keep_prob
 
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1]], name="x")
@@ -31,7 +31,7 @@ class FFNN(NN_utils.AbstractClassifier):
         net = NN_utils.softmax_layer(self._x, [x_shape[1], width_hidden_layers])
 
         for i in xrange(depth):
-            net = NN_utils.softmax_layer(net, [width_hidden_layers, width_hidden_layers])
+            w, net = NN_utils.softmax_layer(net, [width_hidden_layers, width_hidden_layers])
             net = tf.nn.dropout(net, self._dropout_keep_prob)
 
         w0 = tf.Variable(tf.truncated_normal([width_hidden_layers, y_shape_1]))

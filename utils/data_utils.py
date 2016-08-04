@@ -206,7 +206,4 @@ def maybe_prep_psds(args):
         saver_loader.save_ds((X, Y, info))
         print("--")
 
-    for x in xrange(3):
-        print(Y[x][:])
-
     return X, Y, info
