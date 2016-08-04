@@ -1,0 +1,10 @@
+# File structure: #
+
+*./bin/deep_meg* points to ROOT_actual_work.py, which is where the project
+starts.
+
+The program starts by parsing the command line arguments, and by then checking
+in *./ds_transform_saves* if there are any pickled versions of the features
+with corresponding feature generation arguments. Currently, we use joblib.dump
+to make the saves, as we found that that was a fairly fast method to save and
+load
