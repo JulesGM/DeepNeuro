@@ -4,7 +4,7 @@ from __future__ import with_statement, print_function, division
 import os
 
 import six
-from six.moves import range as xrange
+from six.moves import xrange
 from six.moves import zip as izip
 
 import numpy as np
@@ -83,7 +83,7 @@ def residual_block(input_, output_depth, down_sample, projection=False):
 
 
 class AbstractClassifier(object):
-    def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate):
+    def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate, verbose=True):
         with tf.Session() as sess:
             sess.run([tf.initialize_all_variables()])
             for epoch in xrange(n_epochs):
@@ -101,7 +101,7 @@ class AbstractClassifier(object):
                         feed_dict[self._dropout_keep_prob] = self.dropout_keep_prob
                     opt, loss = sess.run([self.opt, self.loss], feed_dict=feed_dict)
 
-                if epoch % 1 == 0 and epoch != 0:
+                if verbose:
                     feed_dict = {
                         self._x: train_x,
                         self._y: train_y
@@ -146,5 +146,5 @@ class AbstractClassifier(object):
                     for i, w in enumerate(vars(self).get("list_w", [])):
                         print("{}:\n{}".format(i, w))
 
-            print("--")
+                print("--")
 

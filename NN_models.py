@@ -1,13 +1,15 @@
 from __future__ import print_function, generators, division, with_statement
 from six import iteritems
 from six.moves import zip as izip
-from six.moves import range as xrange
+from six.moves import xrange
 
 import os
 import sys
 
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
+import scipy.interpolate
 
 import mne
 import mne.time_frequency
@@ -94,13 +96,11 @@ def CNN(X, Y, sample_info, args):
         saver_loader.save_ds(interp_x)
 
 
-def make_interpolated_data(X, res, method, sample_info, sensor_type=True, show=False):
+def make_interpolated_data(X, res, method, sample_info, sensor_type=True, show=True):
     picks = mne.pick_types(sample_info, meg=sensor_type)
     sensor_positions = mne.channels.layout._auto_topomap_coords(sample_info, picks, True)
 
     # Take any valid file's position information, as all raws [are supposed to] have the same positions
-    import matplotlib.pyplot as plt
-    from scipy.interpolate import griddata
 
     assert len(sensor_positions.shape) == 2 and sensor_positions.shape[1] == 2, sensor_positions.shape[1]
     min_x = np.floor(np.min(sensor_positions[:, 0]))
@@ -119,11 +119,12 @@ def make_interpolated_data(X, res, method, sample_info, sensor_type=True, show=F
         if i % 5 == 0:
             sys.stdout.write("\ri: {} of {} ({:4.2f} %))".format(i, i_bound, 100 * i / i_bound))
         for j in xrange(j_bound):
-            psd_image = griddata(sensor_positions[picks, :], X[i, j, picks], grid, method)
+            psd_image = scipy.interpolate.griddata(sensor_positions[picks, :], X[i, j, picks], grid, method)
             interp_x[i, j, :] = psd_image[:, :]
 
             if show:
                 plt.imshow(psd_image, interpolation="none")
                 plt.show()
+
 
     return interp_x

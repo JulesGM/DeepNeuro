@@ -15,7 +15,7 @@ from sklearn.svm import LinearSVC
 from sklearn.linear_model import logistic
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-
+import sklearn.preprocessing
 
 
 def make_samples_linear(x):
@@ -23,7 +23,17 @@ def make_samples_linear(x):
     return linear_x
 
 
-def linear_classification(linear_x, linear_y, job):
+def linear_classification(X, linear_y, job):
+    linear_x = [None, None, None]
+
+    for i in xrange(3):
+        linear_x[i] = make_samples_linear(X[i])
+
+    scaler = sklearn.preprocessing.StandardScaler()
+    linear_x[0] = scaler.fit_transform(linear_x[0])
+    linear_x[1] = scaler.transform(linear_x[1])
+    linear_x[2] = scaler.transform(linear_x[2])
+
     assert len(linear_x) == 3
     assert len(linear_y) == 3
 

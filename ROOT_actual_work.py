@@ -75,17 +75,8 @@ def main(argv):
     ###########################################################################
     # CLASSICAL MACHINE LEARNING CLASSIFICATION without locality
     ###########################################################################
-    linear_x = [None, None, None]
 
-    for i in xrange(3):
-        linear_x[i] = LC.make_samples_linear(X[i])
-
-    scaler = sklearn.preprocessing.StandardScaler()
-    linear_x[0] = scaler.fit_transform(linear_x[0])
-    linear_x[1] = scaler.transform(linear_x[1])
-    linear_x[2] = scaler.transform(linear_x[2])
-
-    LC.linear_classification(linear_x, Y, args.job_type)
+    LC.linear_classification(X, Y, args.job_type)
 
     ###########################################################################
     # LOCALITY PRESERVING CLASSICAL MACHINE LEARNING
