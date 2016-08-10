@@ -1,5 +1,8 @@
 # Compatibility imports
 from __future__ import with_statement, print_function, division
+
+import os
+
 import six
 from six.moves import range as xrange
 from six.moves import zip as izip
@@ -11,15 +14,27 @@ import utils
 
 
 def weight_variable(shape, name=None):
-    initial = tf.truncated_normal(shape, stddev=0.5)
+    initial = tf.random_normal(shape, stddev=0.5)
+    return tf.Variable(initial, name=name)
+
+
+def biais_variable(shape, name=None):
+    initial = tf.zeros(shape)
     return tf.Variable(initial, name=name)
 
 
 def softmax_layer(input_, shape):
     fc_w = weight_variable(shape)
-    fc_b = tf.Variable(tf.truncated_normal([shape[1]]))
-
+    fc_b = biais_variable([shape[1]])
     fc_h = tf.nn.softmax(tf.matmul(input_, fc_w) + fc_b)
+
+    return fc_h, (fc_w, fc_b)
+
+
+def relu_layer(input_, shape):
+    fc_w = weight_variable(shape)
+    fc_b = biais_variable([shape[1]])
+    fc_h = tf.nn.relu(tf.matmul(input_, fc_w) + fc_b)
 
     return fc_h, (fc_w, fc_b)
 
@@ -72,6 +87,7 @@ class AbstractClassifier(object):
         with tf.Session() as sess:
             sess.run([tf.initialize_all_variables()])
             for epoch in xrange(n_epochs):
+                
                 for start in xrange(0, train_x.shape[0], minibatch_size):
                     end = min(train_x.shape[0], start + minibatch_size)
 
@@ -86,19 +102,49 @@ class AbstractClassifier(object):
                     opt, loss = sess.run([self.opt, self.loss], feed_dict=feed_dict)
 
                 if epoch % 1 == 0 and epoch != 0:
-                    feed_dict = {self._x: valid_x[:, :], }
+                    feed_dict = {
+                        self._x: train_x,
+                        self._y: train_y
+                    }
                     if "_dropout_keep_prob" in vars(self):
                         feed_dict[self._dropout_keep_prob] = 1.0
-                    preds_valid = sess.run([self.prediction], feed_dict=feed_dict)
+                    training_predictions, training_loss, training_score, training_l2 = sess.run([self.prediction, self.loss, self.score, self.l2], feed_dict=feed_dict)
 
-                    feed_dict = {self._x: train_x[:, :], }
+                    feed_dict = {
+                        self._x: valid_x,
+                        self._y: valid_y
+                    }
                     if "_dropout_keep_prob" in vars(self):
                         feed_dict[self._dropout_keep_prob] = 1.0
-                    preds_train = sess.run([self.prediction], feed_dict=feed_dict)
-
+                    validation_predictions, validation_loss, validation_score, validation_l2 = sess.run([self.prediction, self.loss, self.score, self.l2], feed_dict=feed_dict)
+                    os.system("tput reset")
                     print("NN: epoch {}:".format(epoch))
-                    print("\t- Loss: {}".format(loss))
-                    print("\t- Score va: {:2.4f}".format(np.average(preds_valid == utils.from_one_hot(valid_y))))
-                    print("\t- Score tr: {:2.4f}".format(np.average(preds_train == utils.from_one_hot(train_y))))
+                    print("\t- validation loss:           {}".format(validation_loss))
+                    print("\t- validation loss l2 ratio:  {}".format(validation_l2 / validation_loss))
+                    print("\t- training loss:             {}".format(training_loss))
+                    print("\t- training loss l2 ratio:    {}".format(training_l2 / training_loss))
+                    print("\t- Score va:          {:2.4f}".format(np.average(validation_predictions == utils.from_one_hot(valid_y))))
+                    print("\t- Score tr:          {:2.4f}".format(np.average(training_predictions == utils.from_one_hot(train_y))))
+                    print("\t- lr:                {}".format(learning_rate))
+                    print("\t- l2_c:              {}".format(vars(self).get("_l2_c", "N/A")))
+                    print("\t- dropout_keep_prob: {}".format(vars(self).get("dropout_keep_prob", "N/A")))
+
+                    training_res_counts = np.unique(training_predictions, return_counts=True)
+                    if training_res_counts[0].shape[0] == 1:
+                        print(">> There seems to only be one type of unique values in the training predictions. "
+                              "This is almost certainly a bug.")
+
+                    validation_res_counts = np.unique(validation_predictions, return_counts=True)
+                    if validation_res_counts[0].shape[0] == 1:
+                        print(">> There seems to only be one type of unique values in the valid predictions. "
+                              "This is almost certainly a bug.")
+
+                    print("\t- train prediction counts: {}".format(training_res_counts))
+                    print("\t- valid prediction counts: {}".format(validation_res_counts))
+
+
+                    for i, w in enumerate(vars(self).get("list_w", [])):
+                        print("{}:\n{}".format(i, w))
+
             print("--")
 

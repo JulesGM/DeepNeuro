@@ -40,8 +40,11 @@ def linear_classification(linear_x, linear_y, job):
     print("Creating the classifiers")
 
     if job == "NN":
-        classifiers = [NN_models.FFNN(linear_x[0].shape, 2, 1, 12, 0.5, 15)
-                       ]
+        classifiers = [NN_models.FFNN(
+            x_shape=linear_x[0].shape, y_shape_1=2,
+            depth=1, width_hidden_layers=10,
+            dropout_keep_prob=0.5, l2_c=1)]
+
     elif job == "SVM":
         c_const = 10.
         for c_exp in xrange(-10, 19, 2):
@@ -71,8 +74,13 @@ def linear_classification(linear_x, linear_y, job):
     for classifier in classifiers:
         if type(classifier) in one_hot_set:
             one_hot_y = [utils.to_one_hot(_y, 2) for _y in linear_y[:2]]
-            classifier.fit(linear_x[0], one_hot_y[0], linear_x[1], one_hot_y[1], 1000000, 64, 0.001)
 
+            # def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate):
+            classifier.fit(
+                train_x=linear_x[0],    train_y=one_hot_y[0],
+                valid_x=linear_x[1],    valid_y=one_hot_y[1],
+                n_epochs=1000000,       minibatch_size=1028,
+                learning_rate=0.0001)
         else:
             print("\t- Classifier:       {:30},   C={},  tol={}".format(
                     classifier.__class__, vars(classifier).get("C", "N/A"), vars(classifier).get("tol", "N/A")))
@@ -86,6 +94,7 @@ def linear_classification(linear_x, linear_y, job):
             print("\t- Valid score:      {}".format(cl.score(valid_x, valid_y)))
             print("\t- valid avg:        {}".format(np.mean(preds_1)))
             print("\t- classif obj:      {}".format(cl))
+
 
             print("\t--")
 

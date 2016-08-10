@@ -30,9 +30,10 @@ logger.disabled = True
 
 def parse_args(argv):
     p = argparse.ArgumentParser(argv)
-    p.add_argument("--nfft",            type=int, default="5")
-    p.add_argument("--glob_tincr",      type=float, default="0.1")
-    p.add_argument("--job_type",        type=str, default="NN")
+    p.add_argument("--nfft",              type=int,   default="200")
+    p.add_argument("--glob_tincr",        type=float, default="1")
+    p.add_argument("--job_type",          type=str,   default="NN")
+    p.add_argument("--established_bands",             default=False, action="store_true")
 
     p.add_argument("--limit",           type=int, default=None)
     p.add_argument("-o", "--data_path", type=str, default=os.path.join(os.environ["HOME"], "aut_gamma"))

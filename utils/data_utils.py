@@ -83,6 +83,30 @@ def data_gen(base_path, limit = None):
         yield name, raw, label, len(full_glob)
 
 
+def established_bands(psds, freqs):
+    assert np.all(np.mean(psds) < 1E6), "We need the raw psds, not the psds converted to dB."
+    bands = [(0, 4, 'Delta'),
+             (4, 8, 'Theta'),
+             (8, 12, 'Alpha'),
+             (12, 30, 'Beta'),
+             (30, 100, 'Gamma')]
+
+    data = np.empty(shape=(psds.shape[0], len(bands)), dtype=np.float32)
+
+
+    for i, (fmin, fmax, title) in enumerate(bands):
+        freq_mask = (fmin <= freqs) & (freqs < fmax)
+        if freq_mask.sum() == 0:
+            raise RuntimeError('No frequencies in band "{name}" ({fmin}, {fmax}).\nFreqs:\n{freqs}'.format(
+                name=title, fmin=fmin, fmax=fmax, freqs=freqs))
+
+        data[:, i] = np.mean(psds[:, freq_mask], axis=1)
+
+    data = 10 * np.log10(data)
+
+    return data
+
+
 def maybe_prep_psds(args):
     if args.glob_tmin != 0:
         print("Warning: --glob_tmin is not equal to zero, this is weid. Value : {}".format(args.glob_tmin))
@@ -108,8 +132,8 @@ def maybe_prep_psds(args):
     X = [None, None, None]
 
     # We build savepaths from different values of the parameters
-    saver_loader = SaverLoader("/home/julesgm/COCO/ds_transform_saves/{limit}_{tincr}_{nfft}_latest_save.pkl" \
-                              .format(limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft))
+    saver_loader = SaverLoader("/home/julesgm/COCO/ds_transform_saves/{eb}{limit}_{tincr}_{nfft}_latest_save.pkl" \
+                              .format(eb="eb_" if args.established_bands else "", limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft))
 
     if saver_loader.save_exists():
         print("Loading pickled dataset")
@@ -154,7 +178,7 @@ def maybe_prep_psds(args):
                         i + 1, files_lim, total,
                         str(psd_band_t_start_ms), str(upper_bound), 100 * psd_band_t_start_ms / upper_bound))
 
-                num_res_db, freqs = mne.time_frequency.psd_welch(
+                psds, freqs = mne.time_frequency.psd_welch(
                                            n_jobs=1, # in our tests, more jobs invariably resulted in slower execution, even on the 32 cores xeons of the Helios cluster.
                                            inst=raw,
                                            picks=mne.pick_types(raw.info, meg=True),
@@ -162,10 +186,15 @@ def maybe_prep_psds(args):
                                            n_overlap=args.noverlap,
                                            tmin=psd_band_t_start_ms / 1000.,
                                            tmax=psd_band_t_start_ms / 1000. + args.glob_tincr,
+                                           fmax=(100 if args.established_bands else np.inf),
                                            verbose="INFO"
                                            )
 
-                num_res_db = 10.0 * np.log10(num_res_db)
+                if args.established_bands:
+                    num_res_db = established_bands(psds, freqs)
+
+                else:
+                    num_res_db = 10 * np.log10(psds)
 
                 if not np.all(np.isfinite(num_res_db)):
                     print("\n>>>>>>>>> {} : has a NAN or INF or NINF post log - skipping this segment ({}:{})\n" \
@@ -178,9 +207,9 @@ def maybe_prep_psds(args):
 
                 if freqs_bands is None:
                     freqs_bands = freqs
+
         print("")
         assert len(Y) == 3
-
 
         for i in xrange(3):
             X[i] = np.dstack(list_x[i])

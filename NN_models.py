@@ -20,34 +20,42 @@ import custom_cells.tensorflow_resnet.resnet_train as tf_resnet_train
 
 
 class FFNN(NN_utils.AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, width_hidden_layers=64, dropout_keep_prob=0.25, l2_c=1):
+    def __init__(self, x_shape, y_shape_1, depth, width_hidden_layers=2,
+                 dropout_keep_prob=1.0, l2_c=0, activation_factory=NN_utils.relu_layer):
         self.dropout_keep_prob = dropout_keep_prob
 
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1]], name="x")
         self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
         self._lr = tf.placeholder(tf.float32, name="learning_rate")
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
+        self._l2_c = l2_c
 
+        self.w_list = []
+        self.b_list = []
 
-        w_list = []
-        net, (w, b)  = NN_utils.softmax_layer(self._x, [x_shape[1], width_hidden_layers])
-        w_list.append(w)
+        net, (w, b) = activation_factory(self._x, [x_shape[1], width_hidden_layers])
+        self.w_list.append(w)
+        self.b_list.append(b)
 
-        for i in xrange(depth):
-            net, (w, b) = NN_utils.softmax_layer(net, [width_hidden_layers, width_hidden_layers])
+        for i in xrange(depth - 1):
+            net, (w, b) = activation_factory(net, [width_hidden_layers, width_hidden_layers])
             net = tf.nn.dropout(net, self._dropout_keep_prob)
-            w_list.append(w)
+            self.w_list.append(w)
+            self.b_list.append(b)
 
         w0 = tf.Variable(tf.truncated_normal([width_hidden_layers, y_shape_1]))
         b0 = tf.Variable(tf.truncated_normal([y_shape_1]))
         a0 = tf.matmul(net, w0) + b0
 
-        w_list.append(w0)
+        self.w_list.append(w0)
+        self.b_list.append(b0)
 
-        squares = sum([tf.reduce_sum(tf.matmul(x, tf.transpose(x))) for x in w_list])
-        l2 = l2_c * squares
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(a0, self._y)) + l2
-        self.opt = tf.train.AdamOptimizer(self._lr).minimize(self.loss)
+        w_squares = sum([tf.reduce_sum(tf.matmul(x, tf.transpose(x))) for x in self.w_list])
+        b_squares = sum([tf.reduce_sum(x * x) for x in self.b_list])
+
+        self.l2 = l2_c * w_squares
+        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(a0, self._y)) + self.l2
+        self.opt = tf.train.AdadeltaOptimizer(self._lr).minimize(self.loss)
         self.score = tf.nn.softmax(a0)
         self.prediction = tf.arg_max(self.score, 1)
 
@@ -66,7 +74,7 @@ class SmallResNet(NN_utils.AbstractClassifier):
         tf_resnet_train.train(self._is_training, logits, images, labels)
 
 
-def DNN(X, Y, sample_info, args):
+def CNN(X, Y, sample_info, args):
     res_x = 10
     res_y = 10
     interp = "cubic"
