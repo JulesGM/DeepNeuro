@@ -12,10 +12,12 @@ import argparse
 import time
 import logging
 import warnings
+
+
 import utils
 import utils.data_utils
-
-import linear_classification as LC
+import linear_classification
+import spatial_classification
 
 import sklearn.preprocessing
 import numpy as np
@@ -32,6 +34,7 @@ def parse_args(argv):
     p = argparse.ArgumentParser(argv)
     p.add_argument("--nfft",              type=int,   default="200")
     p.add_argument("--glob_tincr",        type=float, default="1")
+    p.add_argument("--job_class",         type=str,   default="spatial")
     p.add_argument("--job_type",          type=str,   default="NN")
     p.add_argument("--established_bands",             default=False, action="store_true")
 
@@ -75,25 +78,27 @@ def main(argv):
     ###########################################################################
     # CLASSICAL MACHINE LEARNING CLASSIFICATION without locality
     ###########################################################################
-
-    LC.linear_classification(X, Y, args.job_type)
+    if args.job_class == "linear":
+        linear_classification.linear_classification(X, Y, args.job_type)
 
     ###########################################################################
     # LOCALITY PRESERVING CLASSICAL MACHINE LEARNING
     ###########################################################################
+    # TODO
 
     ###########################################################################
     # VGG classical style CONVOLUTIONAL NEURAL NETWORK
     ###########################################################################
 
-    # 3x3 conv, relu, 3x3 conv, relu, 3x3 conv, relu, maxpool, 3x3 conv, relu, 3x3 conv, relu, maxpool, FC, FC
+    # VGG: 3x3 conv, relu, 3x3 conv, relu, 3x3 conv, relu, maxpool, 3x3 conv, relu, 3x3 conv, relu, maxpool, FC, FC
     # with batchnorm and dropout
 
     ###########################################################################
     # RESNET CONVOLUTIONAL NEURAL NETWORK
     ###########################################################################
-
-    # spatial_classification(interp_X, Y, training_picks, valid_picks, test_picks)
+    elif args.job_class == "spatial":
+        spatial_classification.spatial_classification(X, Y, args.job_type)
+        # spatial_classification(interp_X, Y, training_picks, valid_picks, test_picks)
 
 
 if __name__ == "__main__": main(sys.argv)
