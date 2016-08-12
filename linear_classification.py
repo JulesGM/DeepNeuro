@@ -6,7 +6,6 @@ from six.moves import zip as izip
 
 import utils
 import NN_models
-
 import numpy as np
 
 # Sklearn imports
@@ -23,11 +22,11 @@ def make_samples_linear(x):
     return linear_x
 
 
-def linear_classification(X, linear_y, job):
+def linear_classification(x, y, job):
     linear_x = [None, None, None]
 
     for i in xrange(3):
-        linear_x[i] = make_samples_linear(X[i])
+        linear_x[i] = make_samples_linear(x[i])
 
     scaler = sklearn.preprocessing.StandardScaler()
     linear_x[0] = scaler.fit_transform(linear_x[0])
@@ -35,15 +34,15 @@ def linear_classification(X, linear_y, job):
     linear_x[2] = scaler.transform(linear_x[2])
 
     assert len(linear_x) == 3
-    assert len(linear_y) == 3
+    assert len(y) == 3
 
     training_x = linear_x[0]
     valid_x = linear_x[1]
     test_x = linear_x[2]
 
-    training_y = linear_y[0]
-    valid_y = linear_y[1]
-    test_y = linear_y[2]
+    training_y = y[0]
+    valid_y = y[1]
+    test_y = y[2]
 
     classifiers = []
 
@@ -59,6 +58,13 @@ def linear_classification(X, linear_y, job):
         c_const = 10.
         for c_exp in xrange(-10, 19, 2):
             classifiers.append(SVC(C=c_const ** c_exp, kernel="linear", verbose=True, max_iter=1))
+
+    elif job == "rbf":
+        c_const = 10.
+        gamma_const = 10.
+        for c_exp in xrange(-2, 6, 2):
+            for gamma_exp in xrange(-30, 0, 3):
+                classifiers.append(SVC(C=c_const ** c_exp, kernel="rbf", gamma=gamma_const ** gamma_exp, verbose=True, max_iter=1000))
 
     elif job == "KNN":
         for metric in ["minkowski", "euclidean", "manhattan", "chebyshev", "wminkowski", "seuclidean", "mahalanobis"]:
@@ -83,7 +89,7 @@ def linear_classification(X, linear_y, job):
 
     for classifier in classifiers:
         if type(classifier) in one_hot_set:
-            one_hot_y = [utils.to_one_hot(_y, 2) for _y in linear_y[:2]]
+            one_hot_y = [utils.to_one_hot(_y, 2) for _y in y[:2]]
 
             # def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate):
             classifier.fit(
@@ -92,13 +98,13 @@ def linear_classification(X, linear_y, job):
                 n_epochs=1000000,       minibatch_size=1028,
                 learning_rate=0.0001)
         else:
-            print("\t- Classifier:       {:30},   C={},  tol={}".format(
-                    classifier.__class__, vars(classifier).get("C", "N/A"), vars(classifier).get("tol", "N/A")))
+            #print("\t- Classifier:       {:30},   C={},  tol={}".format(
+            #        classifier.__class__, vars(classifier).get("C", "N/A"), vars(classifier).get("tol", "N/A")))
 
-            print("\t- Fitting the model")
+            #print("\t- Fitting the model")
             cl = classifier.fit(training_x, training_y)
             assert cl is classifier
-            print("\t- Making predictions and calculating the accuracy scores")
+            #print("\t- Making predictions and calculating the accuracy scores")
             preds_1 = cl.predict(valid_x)
             print("\t- Training score:   {}".format(cl.score(training_x, training_y)))
             print("\t- Valid score:      {}".format(cl.score(valid_x, valid_y)))

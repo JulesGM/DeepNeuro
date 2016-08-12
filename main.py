@@ -34,8 +34,8 @@ def parse_args(argv):
     p = argparse.ArgumentParser(argv)
     p.add_argument("--nfft",              type=int,   default="200")
     p.add_argument("--glob_tincr",        type=float, default="1")
-    p.add_argument("--job_class",         type=str,   default="spatial")
-    p.add_argument("--job_type",          type=str,   default="NN")
+    p.add_argument("--job_class",         type=str,   default="linear")
+    p.add_argument("--job_type",          type=str,   default="SVM")
     p.add_argument("--established_bands",             default=False, action="store_true")
 
     p.add_argument("--limit",           type=int, default=None)
@@ -99,6 +99,7 @@ def main(argv):
     elif args.job_class == "spatial":
         spatial_classification.spatial_classification(X, Y, args.job_type)
         # spatial_classification(interp_X, Y, training_picks, valid_picks, test_picks)
-
+    else:
+        raise RuntimeError("job_class argument unsupported: {}".format(args.job_class))
 
 if __name__ == "__main__": main(sys.argv)

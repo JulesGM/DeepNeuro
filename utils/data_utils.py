@@ -132,7 +132,7 @@ def maybe_prep_psds(args):
     X = [None, None, None]
 
     # We build savepaths from different values of the parameters
-    saver_loader = SaverLoader("/home/julesgm/COCO/ds_transform_saves/{eb}{limit}_{tincr}_{nfft}_latest_save.pkl" \
+    saver_loader = SaverLoader("/home/julesgm/COCO/saves/ds_transform_saves/{eb}{limit}_{tincr}_{nfft}_latest_save.pkl" \
                               .format(eb="eb_" if args.established_bands else "", limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft))
 
     if saver_loader.save_exists():

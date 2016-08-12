@@ -108,7 +108,8 @@ class AbstractClassifier(object):
                     }
                     if "_dropout_keep_prob" in vars(self):
                         feed_dict[self._dropout_keep_prob] = 1.0
-                    training_predictions, training_loss, training_score, training_l2 = sess.run([self.prediction, self.loss, self.score, self.l2], feed_dict=feed_dict)
+                    training_predictions, training_loss, training_score, training_l2 = sess.run([
+                        self.prediction, self.loss, self.score, vars(self).get("l2", tf.constant(-1))], feed_dict=feed_dict)
 
                     feed_dict = {
                         self._x: valid_x,
@@ -116,7 +117,9 @@ class AbstractClassifier(object):
                     }
                     if "_dropout_keep_prob" in vars(self):
                         feed_dict[self._dropout_keep_prob] = 1.0
-                    validation_predictions, validation_loss, validation_score, validation_l2 = sess.run([self.prediction, self.loss, self.score, self.l2], feed_dict=feed_dict)
+                    validation_predictions, validation_loss, validation_score, validation_l2 = sess.run([
+                        self.prediction, self.loss, self.score, vars(self).get("l2", tf.constant(-1))], feed_dict=feed_dict)
+
                     os.system("tput reset")
                     print("NN: epoch {}:".format(epoch))
                     print("\t- validation loss:           {}".format(validation_loss))
