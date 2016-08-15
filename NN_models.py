@@ -20,10 +20,15 @@ import NN_utils
 import custom_cells.tensorflow_resnet as tf_resnet
 import custom_cells.tensorflow_resnet.resnet_train as tf_resnet_train
 
+default_base_path = os.path.join(os.path.dirname(__file__), "saves", "tf_summaries")
+default_summary_path = default_base_path
+
 
 class FFNN(NN_utils.AbstractClassifier):
     def __init__(self, x_shape_1, y_shape_1, depth, width_hidden_layers=2,
-                 dropout_keep_prob=1.0, l2_c=0, activation_factory=NN_utils.relu_layer):
+                 dropout_keep_prob=1.0, l2_c=0,
+                 summary_writing_path=default_summary_path, activation_factory=NN_utils.relu_layer):
+        super(self.__class__, self).__init__(summary_writing_path)
         self.dropout_keep_prob = dropout_keep_prob
 
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape_1], name="x")
@@ -32,89 +37,51 @@ class FFNN(NN_utils.AbstractClassifier):
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
         self._l2_c = l2_c
 
-        self.w_list = []
-        self.b_list = []
-
         net, (w, b) = activation_factory(self._x, [x_shape_1, width_hidden_layers])
-        self.w_list.append(w)
-        self.b_list.append(b)
 
         for i in xrange(depth - 1):
             net, (w, b) = activation_factory(net, [width_hidden_layers, width_hidden_layers])
             net = tf.nn.dropout(net, self._dropout_keep_prob)
-            self.w_list.append(w)
-            self.b_list.append(b)
-
-        w0 = tf.Variable(tf.truncated_normal([width_hidden_layers, y_shape_1]))
-        b0 = tf.Variable(tf.truncated_normal([y_shape_1]))
-        a0 = tf.matmul(net, w0) + b0
-
-        self.w_list.append(w0)
-        self.b_list.append(b0)
-
-        w_squares = sum([tf.reduce_sum(tf.matmul(x, tf.transpose(x))) for x in self.w_list])
-        # b_squares = sum([tf.reduce_sum(x * x) for x in self.b_list])
-
-        self.l2 = l2_c * w_squares
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(a0, self._y)) + self.l2
-        self.opt = tf.train.AdamOptimizer().minimize(self.loss)
-        self.score = tf.nn.softmax(a0)
-        self.prediction = tf.arg_max(self.score, 1)
 
 
-class SmallResNet(object):
-    def __init__(self, training_interp_x, training_y, validation_interp_x, validation_y, depth, num_classes, learning_rate, minibatch_size):
-        self.minibatch_size = minibatch_size
-        self.learning_rate = learning_rate
+        w_squares = sum([tf.reduce_sum(tf.matmul(x, tf.transpose(x))) for x in self._w_list])
+        self._l2 = l2_c * w_squares
 
-        self._is_training = tf.placeholder('bool', [], name='is_training')
-
-        self._images, self._labels = tf.cond(self._is_training,
-                                 lambda: (training_interp_x,   training_y),
-                                 lambda: (validation_interp_x, validation_y),)
-
-        self._logits = tf_resnet.inference_small(self._images, is_training=self._is_training,
-                                                 use_bias=False, num_blocks=depth, num_classes=num_classes)
-
-    def fit(self):
-        tf_resnet_train.train(self._is_training, self._logits, self._images, self._labels, self.minibatch_size,
-                              self.learning_rate)
+        self.finish_init(net)
 
 
 class CNN(NN_utils.AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob):
+    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob, filter_scale_factor=2,
+                 summary_writing_path=default_summary_path):
+        super(self.__class__, self).__init__(summary_writing_path)
+
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1], x_shape[2], x_shape[3]], name="x")
         self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
         self._lr = tf.placeholder(tf.float32, name="learning_rate")
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
         self.dropout_keep_prob = dropout_keep_prob
 
-
-        net = NN_utils.conv_layer(self._x, (3, 3, x_shape[3], x_shape[3] * 2), 1)
+        net = NN_utils.conv_layer(self._x, (3, 3, x_shape[3], int(x_shape[3] * filter_scale_factor)), 1)
         net = tf.nn.dropout(net, self._dropout_keep_prob)
+
         for i in xrange(depth - 1):
-            net = NN_utils.conv_layer(net, (3, 3, net.get_shape().as_list()[3], net.get_shape().as_list()[3] * 2), 1)
+            filter_shape = (3, 3, net.get_shape().as_list()[3], int(net.get_shape().as_list()[3] * filter_scale_factor))
+            net = NN_utils.conv_layer(net, filter_shape, 1)
             net = tf.nn.dropout(net, self._dropout_keep_prob)
 
-        shape = net.get_shape().as_list()
-        w0 = tf.Variable(tf.truncated_normal([np.product(net.get_shape().as_list()[1:]), y_shape_1]))
-        b0 = tf.Variable(tf.truncated_normal([y_shape_1]))
-        a0 = tf.matmul(tf.reshape(net, [-1, shape[1] * shape[2] * shape[3]]), w0) + b0
-
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(a0, self._y))
-        self.opt = tf.train.AdamOptimizer(self._lr).minimize(self.loss)
-        self.score = tf.nn.softmax(a0)
-        self.prediction = tf.arg_max(self.score, 1)
+        self.finish_init(net, y_shape_1)
 
 
-class BetterResNet(NN_utils.AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob):
+class ResNet(NN_utils.AbstractClassifier):
+    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob,
+                 summary_writing_path=default_summary_path):
+        super(self.__class__, self).__init__(summary_writing_path)
+
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1], x_shape[2], x_shape[3]], name="x")
         self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
         self._lr = tf.placeholder(tf.float32, name="learning_rate")
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
         self.dropout_keep_prob = dropout_keep_prob
-
 
         net = NN_utils.residual_block(self._x, x_shape[3] * 2, False)
         net = tf.nn.dropout(net, self._dropout_keep_prob)
@@ -122,19 +89,10 @@ class BetterResNet(NN_utils.AbstractClassifier):
             net = NN_utils.residual_block(net, net.get_shape().as_list()[3] * 2, False)
             net = tf.nn.dropout(net, self._dropout_keep_prob)
 
-        shape = net.get_shape().as_list()
-        w0 = tf.Variable(tf.truncated_normal([np.product(net.get_shape().as_list()[1:]), y_shape_1]))
-        b0 = tf.Variable(tf.truncated_normal([y_shape_1]))
-        a0 = tf.matmul(tf.reshape(net, [-1, shape[1] * shape[2] * shape[3]]), w0) + b0
-
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(a0, self._y))
-        self.opt = tf.train.AdamOptimizer(self._lr).minimize(self.loss)
-        self.score = tf.nn.softmax(a0)
-        self.prediction = tf.arg_max(self.score, 1)
+        self.finish_init(net)
 
 
-
-def make_interpolated_data(X, res, method, sample_info, sensor_type=True, show=True):
+def make_interpolated_data(x, res, method, sample_info, sensor_type="mag", show=False):
     picks = mne.pick_types(sample_info, meg=sensor_type)
     sensor_positions = mne.channels.layout._auto_topomap_coords(sample_info, picks, True)
 
@@ -149,19 +107,30 @@ def make_interpolated_data(X, res, method, sample_info, sensor_type=True, show=T
     grid_x, grid_y = np.meshgrid(np.linspace(min_x, max_x, res[0],), np.linspace(min_y, max_y, res[1]))
     grid = (grid_x, grid_y)
 
-    interp_x = np.empty([X.shape[utils.X_Dims.samples_and_times.value], X.shape[utils.X_Dims.fft_ch.value], res[0], res[1]], dtype=np.float32)
+    interp_x = [None, None, None]
 
-    i_bound = X.shape[utils.X_Dims.samples_and_times.value]
-    j_bound = X.shape[utils.X_Dims.fft_ch.value]
-    for i in xrange(i_bound):
-        if i % 5 == 0:
-            sys.stdout.write("\ri: {} of {} ({:4.2f} %))".format(i, i_bound, 100 * i / i_bound))
-        for j in xrange(j_bound):
-            psd_image = scipy.interpolate.griddata(sensor_positions[picks, :], X[i, j, picks], grid, method)
-            interp_x[i, j, :] = psd_image[:, :]
+    for sample_set_idx in xrange(2): # There is currently no reason to do the test set. it being hardcoded is really poor,
+                                     # but such is life
+        interp_x[sample_set_idx] = np.empty([x[sample_set_idx].shape[utils.X_Dims.samples_and_times.value],
+                                             x[sample_set_idx].shape[utils.X_Dims.fft_ch.value], res[0], res[1]],
+                                            dtype=np.float32)
+        sample_bound = x[sample_set_idx].shape[utils.X_Dims.samples_and_times.value]
+        fft_bound = x[sample_set_idx].shape[utils.X_Dims.fft_ch.value]
 
-            if show:
-                plt.imshow(psd_image, interpolation="none")
-                plt.show()
+        for sample_idx_per_set in xrange(sample_bound):
+            if sample_idx_per_set % 5 == 0:
+                sys.stdout.write("\rk: '{}', i: {} of {} ({:4.2f} %))".format(
+                    sample_set_idx, sample_idx_per_set, sample_bound, 100 * sample_idx_per_set / sample_bound))
+            for fft_channel_idx in xrange(fft_bound):
+                psd_image = scipy.interpolate.griddata(
+                    sensor_positions, x[sample_set_idx][sample_idx_per_set, fft_channel_idx, picks], grid, method, 0)
+                interp_x[sample_set_idx][sample_idx_per_set, fft_channel_idx] = psd_image
 
-    return interp_x
+                if show:
+                    plt.imshow(psd_image, interpolation="none")
+                    plt.show()
+
+        assert np.all(np.isfinite(interp_x[sample_set_idx]))
+        interp_x[sample_set_idx] = np.swapaxes(np.swapaxes(interp_x[sample_set_idx], 1, 2), 2, 3)
+
+    return interp_x, str(abs((res, method, sensor_type).__hash__()))

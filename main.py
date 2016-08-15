@@ -30,15 +30,17 @@ logger = logging.getLogger('mne')
 logger.disabled = True
 
 
+
 def parse_args(argv):
     p = argparse.ArgumentParser(argv)
-    p.add_argument("--nfft",              type=int,   default="200")
+    p.add_argument("--nfft",              type=int,   default="100")
     p.add_argument("--glob_tincr",        type=float, default="1")
-    p.add_argument("--job_class",         type=str,   default="linear")
+    p.add_argument("--job_class",         type=str,   default="spatial")
     p.add_argument("--job_type",          type=str,   default="SVM")
     p.add_argument("--established_bands",             default=False, action="store_true")
+    p.add_argument("--res",               type=tuple, default=(33, 33))
+    p.add_argument("--limit",             type=int,   default=None)
 
-    p.add_argument("--limit",           type=int, default=None)
     p.add_argument("-o", "--data_path", type=str, default=os.path.join(os.environ["HOME"], "aut_gamma"))
     p.add_argument("--noverlap",        type=int, default=0)
     p.add_argument("--glob_tmin",       type=int, default=0)
@@ -46,7 +48,11 @@ def parse_args(argv):
 
     return p.parse_args(argv[1:])
 
-
+# @click.group()
+# @click.option("--nfft",              default=200,   type=float)
+# @click.option("--tincr",             default=1,     type=int)
+# @click.option("--established_bands", default=False, type=bool)
+# @click.pass_context()
 def main(argv):
     args = parse_args(argv)
 
@@ -89,7 +95,6 @@ def main(argv):
     ###########################################################################
     # VGG classical style CONVOLUTIONAL NEURAL NETWORK
     ###########################################################################
-
     # VGG: 3x3 conv, relu, 3x3 conv, relu, 3x3 conv, relu, maxpool, 3x3 conv, relu, 3x3 conv, relu, maxpool, FC, FC
     # with batchnorm and dropout
 
@@ -97,9 +102,27 @@ def main(argv):
     # RESNET CONVOLUTIONAL NEURAL NETWORK
     ###########################################################################
     elif args.job_class == "spatial":
-        spatial_classification.spatial_classification(X, Y, args.job_type)
-        # spatial_classification(interp_X, Y, training_picks, valid_picks, test_picks)
+        spatial_classification.spatial_classification(X, Y, args.res, args.nfft, args.glob_tincr,
+                                                      args.established_bands, sample_info, args.job_type)
     else:
         raise RuntimeError("job_class argument unsupported: {}".format(args.job_class))
+
+
+# @main.command()
+# @click.pass_context()
+# @linear_classification.linear_classification
+
+# @main.group()
+# @click.option("--res", default=(33, 33), type=(int, int))
+# @click.pass_context()
+# spatial_classification.spatial_classification
+
+# @spatial_classification.command()
+# @click.pass_context()
+# spatial_classification.cnn
+
+# @spatial_classification.command()
+# @click.pass_context()
+# spatial_classification.resnet
 
 if __name__ == "__main__": main(sys.argv)
