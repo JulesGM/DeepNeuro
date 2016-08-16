@@ -13,8 +13,6 @@ import numpy as np
 
 
 def spatial_classification(x, y, res, nfft, tincr, use_established_bands, info, job_type):
-
-
     descript = {}
     descript["res"] = res
     descript["nfft"] = nfft
@@ -49,5 +47,7 @@ def spatial_classification(x, y, res, nfft, tincr, use_established_bands, info, 
     print(x_shape)
     print(y_shape_1)
 
-    model = NN_models.CNN(x_shape, y_shape_1, 2, .8)
-    model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y, 10000000, 512, 0.0001)
+    model = NN_models.CNN(x_shape, y_shape_1, depth=3, dropout_keep_prob=.9, filter_scale_factor=1.5)
+    model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y,
+                            n_epochs=10000000,
+                            minibatch_size=128, learning_rate=0.001)

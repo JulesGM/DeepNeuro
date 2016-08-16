@@ -132,8 +132,8 @@ def maybe_prep_psds(args):
     X = [None, None, None]
 
     # We build savepaths from different values of the parameters
-    saver_loader = SaverLoader("/home/julesgm/COCO/saves/ds_transform_saves/{eb}{limit}_{tincr}_{nfft}_latest_save.pkl" \
-                              .format(eb="eb_" if args.established_bands else "", limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft))
+    saver_loader = SaverLoader("/home/julesgm/COCO/saves/ds_transform_saves/{eb}_{fmax}_{limit}_{tincr}_{nfft}_latest_save.pkl" \
+                              .format(eb="eb_" if args.established_bands else "", fmax=args.fmax, limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft))
 
     if saver_loader.save_exists():
         print("Loading pickled dataset")
@@ -186,7 +186,7 @@ def maybe_prep_psds(args):
                                            n_overlap=args.noverlap,
                                            tmin=psd_band_t_start_ms / 1000.,
                                            tmax=psd_band_t_start_ms / 1000. + args.glob_tincr,
-                                           fmax=(100 if args.established_bands else np.inf),
+                                           fmax=(min(100, args.fmax) if args.established_bands else args.fmax),
                                            verbose="INFO"
                                            )
 

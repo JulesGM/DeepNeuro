@@ -28,6 +28,7 @@ class FFNN(NN_utils.AbstractClassifier):
     def __init__(self, x_shape_1, y_shape_1, depth, width_hidden_layers=2,
                  dropout_keep_prob=1.0, l2_c=0,
                  summary_writing_path=default_summary_path, activation_factory=NN_utils.relu_layer):
+
         super(self.__class__, self).__init__(summary_writing_path)
         self.dropout_keep_prob = dropout_keep_prob
 
@@ -37,12 +38,11 @@ class FFNN(NN_utils.AbstractClassifier):
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
         self._l2_c = l2_c
 
-        net, (w, b) = activation_factory(self._x, [x_shape_1, width_hidden_layers])
+        net, (_, _) = activation_factory(self._x, [x_shape_1, width_hidden_layers])
 
-        for i in xrange(depth - 1):
-            net, (w, b) = activation_factory(net, [width_hidden_layers, width_hidden_layers])
+        for _ in xrange(depth - 1):
+            net, (_, _) = activation_factory(net, [width_hidden_layers, width_hidden_layers])
             net = tf.nn.dropout(net, self._dropout_keep_prob)
-
 
         w_squares = sum([tf.reduce_sum(tf.matmul(x, tf.transpose(x))) for x in self._w_list])
         self._l2 = l2_c * w_squares
@@ -51,21 +51,20 @@ class FFNN(NN_utils.AbstractClassifier):
 
 
 class CNN(NN_utils.AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob, filter_scale_factor=2,
+    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob, filter_scale_factor,
                  summary_writing_path=default_summary_path):
         super(self.__class__, self).__init__(summary_writing_path)
-
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1], x_shape[2], x_shape[3]], name="x")
         self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
         self._lr = tf.placeholder(tf.float32, name="learning_rate")
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
         self.dropout_keep_prob = dropout_keep_prob
 
-        net = NN_utils.conv_layer(self._x, (3, 3, x_shape[3], int(x_shape[3] * filter_scale_factor)), 1)
-        net = tf.nn.dropout(net, self._dropout_keep_prob)
-
-        for i in xrange(depth - 1):
-            filter_shape = (3, 3, net.get_shape().as_list()[3], int(net.get_shape().as_list()[3] * filter_scale_factor))
+        net = self._x
+        for _ in xrange(depth - 1):
+            input_depth = net.get_shape().as_list()[3]
+            output_depth = int(input_depth * filter_scale_factor)
+            filter_shape = (3, 3, input_depth, output_depth)
             net = NN_utils.conv_layer(net, filter_shape, 1)
             net = tf.nn.dropout(net, self._dropout_keep_prob)
 
@@ -73,31 +72,30 @@ class CNN(NN_utils.AbstractClassifier):
 
 
 class ResNet(NN_utils.AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob,
+    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob, filter_scale_factor,
                  summary_writing_path=default_summary_path):
         super(self.__class__, self).__init__(summary_writing_path)
-
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1], x_shape[2], x_shape[3]], name="x")
         self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
         self._lr = tf.placeholder(tf.float32, name="learning_rate")
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
         self.dropout_keep_prob = dropout_keep_prob
+        filter_scale_factor = tf.constant(filter_scale_factor, name="filter_scale_factor")
 
-        net = NN_utils.residual_block(self._x, x_shape[3] * 2, False)
-        net = tf.nn.dropout(net, self._dropout_keep_prob)
-        for i in xrange(depth - 1):
-            net = NN_utils.residual_block(net, net.get_shape().as_list()[3] * 2, False)
+        net = self._x
+        for _ in xrange(depth - 1):
+            input_depth = net.get_shape().as_list()[3]
+            output_depth = int(input_depth * filter_scale_factor)
+            net = NN_utils.residual_block(net, output_depth, False)
             net = tf.nn.dropout(net, self._dropout_keep_prob)
 
         self.finish_init(net)
 
 
-def make_interpolated_data(x, res, method, sample_info, sensor_type="mag", show=False):
+def make_interpolated_data(x, res, method, sample_info, sensor_type="grad", show=False):
     picks = mne.pick_types(sample_info, meg=sensor_type)
     sensor_positions = mne.channels.layout._auto_topomap_coords(sample_info, picks, True)
-
     # Take any valid file's position information, as all raws [are supposed to] have the same positions
-
     assert len(sensor_positions.shape) == 2 and sensor_positions.shape[1] == 2, sensor_positions.shape[1]
     min_x = np.floor(np.min(sensor_positions[:, 0]))
     max_x = np.ceil(np.max(sensor_positions[:, 0]))

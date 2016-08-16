@@ -33,12 +33,13 @@ logger.disabled = True
 
 def parse_args(argv):
     p = argparse.ArgumentParser(argv)
-    p.add_argument("--nfft",              type=int,   default="100")
+    p.add_argument("--nfft",              type=int,   default="1000")
+    p.add_argument("--fmax",              type=int,   default="100")
     p.add_argument("--glob_tincr",        type=float, default="1")
     p.add_argument("--job_class",         type=str,   default="spatial")
     p.add_argument("--job_type",          type=str,   default="SVM")
     p.add_argument("--established_bands",             default=False, action="store_true")
-    p.add_argument("--res",               type=tuple, default=(33, 33))
+    p.add_argument("--res",               type=tuple, default=(20, 20))
     p.add_argument("--limit",             type=int,   default=None)
 
     p.add_argument("-o", "--data_path", type=str, default=os.path.join(os.environ["HOME"], "aut_gamma"))
