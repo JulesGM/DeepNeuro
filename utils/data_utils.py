@@ -102,8 +102,6 @@ def established_bands(psds, freqs):
 
         data[:, i] = np.mean(psds[:, freq_mask], axis=1)
 
-    data = 10 * np.log10(data)
-
     return data
 
 
@@ -193,8 +191,7 @@ def maybe_prep_psds(args):
                 if args.established_bands:
                     num_res_db = established_bands(psds, freqs)
 
-                else:
-                    num_res_db = 10 * np.log10(psds)
+                num_res_db = 10 * np.log10(psds)
 
                 if not np.all(np.isfinite(num_res_db)):
                     print("\n>>>>>>>>> {} : has a NAN or INF or NINF post log - skipping this segment ({}:{})\n" \

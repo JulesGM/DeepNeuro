@@ -39,7 +39,6 @@ class FFNN(NN_utils.AbstractClassifier):
         self._l2_c = l2_c
 
         net, (_, _) = activation_factory(self._x, [x_shape_1, width_hidden_layers])
-
         for _ in xrange(depth - 1):
             net, (_, _) = activation_factory(net, [width_hidden_layers, width_hidden_layers])
             net = tf.nn.dropout(net, self._dropout_keep_prob)
@@ -61,7 +60,7 @@ class CNN(NN_utils.AbstractClassifier):
         self.dropout_keep_prob = dropout_keep_prob
 
         net = self._x
-        for _ in xrange(depth - 1):
+        for _ in xrange(depth):
             input_depth = net.get_shape().as_list()[3]
             output_depth = int(input_depth * filter_scale_factor)
             filter_shape = (3, 3, input_depth, output_depth)
@@ -83,7 +82,7 @@ class ResNet(NN_utils.AbstractClassifier):
         filter_scale_factor = tf.constant(filter_scale_factor, name="filter_scale_factor")
 
         net = self._x
-        for _ in xrange(depth - 1):
+        for _ in xrange(depth):
             input_depth = net.get_shape().as_list()[3]
             output_depth = int(input_depth * filter_scale_factor)
             net = NN_utils.residual_block(net, output_depth, False)
@@ -96,7 +95,7 @@ def make_interpolated_data(x, res, method, sample_info, sensor_type="grad", show
     picks = mne.pick_types(sample_info, meg=sensor_type)
     sensor_positions = mne.channels.layout._auto_topomap_coords(sample_info, picks, True)
     # Take any valid file's position information, as all raws [are supposed to] have the same positions
-    assert len(sensor_positions.shape) == 2 and sensor_positions.shape[1] == 2, sensor_positions.shape[1]
+    assert len(sensor_positions.sh)ape) == 2 and sensor_positions.shape[1] == 2, sensor_positions.shape[1]
     min_x = np.floor(np.min(sensor_positions[:, 0]))
     max_x = np.ceil(np.max(sensor_positions[:, 0]))
     min_y = np.floor(np.min(sensor_positions[:, 1]))
@@ -106,6 +105,10 @@ def make_interpolated_data(x, res, method, sample_info, sensor_type="grad", show
     grid = (grid_x, grid_y)
 
     interp_x = [None, None, None]
+
+    # Merge grad data
+    ## picks = mne.channels.layout._pair_grad_sensors(sample_info)
+    ## x = mne.channels.layout._merge_grad_data(x[picks])
 
     for sample_set_idx in xrange(2): # There is currently no reason to do the test set. it being hardcoded is really poor,
                                      # but such is life

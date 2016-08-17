@@ -9,7 +9,6 @@ from six.moves import zip as izip
 
 import numpy as np
 import tensorflow as tf
-
 import utils
 
 
