@@ -17,6 +17,7 @@ else:
     target = d_target
 
 exclude_list = [
+		"saves/",
                 "modules_repo/",
                 "scores/",
                 "fif_split.json",

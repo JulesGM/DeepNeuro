@@ -9,9 +9,9 @@ import utils.data_utils
 import NN_models
 
 import numpy as np
+import os
 
-
-
+base_path = os.path.join(os.path.dirname(__file__))
 def spatial_classification(x, y, res, nfft, tincr, use_established_bands, info, job_type):
     descript = {}
     descript["res"] = res
@@ -22,7 +22,7 @@ def spatial_classification(x, y, res, nfft, tincr, use_established_bands, info, 
     # make a hash of the description for the filename, that way we know to load a save if it has the same hash as a name,
     # or to compute the interpolations if not
     name = tuple(sorted(descript.items(), key=lambda x: x[0])).__hash__()
-    saver_loader = utils.data_utils.SaverLoader("/home/julesgm/COCO/saves/interp_image_saves/{}.pkl".format(name))
+    saver_loader = utils.data_utils.SaverLoader(os.path.join(base_path, "saves/interp_image_saves/{}.pkl".format(name)))
 
     if saver_loader.save_exists():
         prepared_x, descript = saver_loader.load_ds()

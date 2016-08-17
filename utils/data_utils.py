@@ -129,9 +129,10 @@ def maybe_prep_psds(args):
 
     X = [None, None, None]
 
+    base_path = os.path.join(os.path.dirname(__file__))
     # We build savepaths from different values of the parameters
-    saver_loader = SaverLoader("/home/julesgm/COCO/saves/ds_transform_saves/{eb}_{fmax}_{limit}_{tincr}_{nfft}_latest_save.pkl" \
-                              .format(eb="eb_" if args.established_bands else "", fmax=args.fmax, limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft))
+    saver_loader = SaverLoader(os.path.join(base_path, "saves/ds_transform_saves/{eb}_{fmax}_{limit}_{tincr}_{nfft}_latest_save.pkl" \
+                              .format(eb="eb_" if args.established_bands else "", fmax=args.fmax, limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft)))
 
     if saver_loader.save_exists():
         print("Loading pickled dataset")
