@@ -17,8 +17,6 @@ import mne.channels.layout
 
 import utils
 import NN_utils
-import custom_cells.tensorflow_resnet as tf_resnet
-import custom_cells.tensorflow_resnet.resnet_train as tf_resnet_train
 
 default_base_path = os.path.join(os.path.dirname(__file__), "saves", "tf_summaries")
 default_summary_path = default_base_path
@@ -95,7 +93,7 @@ def make_interpolated_data(x, res, method, sample_info, sensor_type="grad", show
     picks = mne.pick_types(sample_info, meg=sensor_type)
     sensor_positions = mne.channels.layout._auto_topomap_coords(sample_info, picks, True)
     # Take any valid file's position information, as all raws [are supposed to] have the same positions
-    assert len(sensor_positions.sh)ape) == 2 and sensor_positions.shape[1] == 2, sensor_positions.shape[1]
+    assert len(sensor_positions.shape) == 2 and sensor_positions.shape[1] == 2, sensor_positions.shape[1]
     min_x = np.floor(np.min(sensor_positions[:, 0]))
     max_x = np.ceil(np.max(sensor_positions[:, 0]))
     min_y = np.floor(np.min(sensor_positions[:, 1]))
