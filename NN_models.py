@@ -89,7 +89,7 @@ class ResNet(NN_utils.AbstractClassifier):
         self.finish_init(net)
 
 
-def make_interpolated_data(x, res, method, sample_info, sensor_type="grad", show=False):
+def make_interpolated_data(x, res, method, sample_info, sensor_type=True, show=False):
     picks = mne.pick_types(sample_info, meg=sensor_type)
     sensor_positions = mne.channels.layout._auto_topomap_coords(sample_info, picks, True)
     # Take any valid file's position information, as all raws [are supposed to] have the same positions

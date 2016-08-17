@@ -29,8 +29,6 @@ logging.basicConfig(level=logging.ERROR) seem to be working.
 logger = logging.getLogger('mne')
 logger.disabled = True
 
-
-
 def parse_args(argv):
     p = argparse.ArgumentParser(argv)
     p.add_argument("--nfft",              type=int,   default="1000")
