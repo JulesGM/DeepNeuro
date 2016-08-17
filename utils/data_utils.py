@@ -11,7 +11,7 @@ import mne.io.pick
 import utils
 
 mne.set_log_level("ERROR")
-
+base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)))
 
 class SaverLoader(object):
     def __init__(self, path):
@@ -129,7 +129,6 @@ def maybe_prep_psds(args):
 
     X = [None, None, None]
 
-    base_path = os.path.join(os.path.dirname(__file__))
     # We build savepaths from different values of the parameters
     saver_loader = SaverLoader(os.path.join(base_path, "saves/ds_transform_saves/{eb}_{fmax}_{limit}_{tincr}_{nfft}_latest_save.pkl" \
                               .format(eb="eb_" if args.established_bands else "", fmax=args.fmax, limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft)))

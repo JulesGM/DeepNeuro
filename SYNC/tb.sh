@@ -24,7 +24,7 @@ else
 fi
 
 
-REMOTE_PORT=9999
+REMOTE_PORT=8888
 
 VENV=/home/julesgm/COCO/FAKE_SCRATCH/myenv/bin/activate
 CMD="
