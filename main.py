@@ -12,8 +12,7 @@ import logging
 # local imports
 import utils
 import utils.data_utils
-import linear_classification
-import spatial_classification
+
 
 # external imports
 import numpy as np
@@ -27,7 +26,7 @@ logger = logging.getLogger('mne')
 logger.disabled = True
 base_path = os.path.dirname(__file__)
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.option("--nfft",               type=int,     default=3000)
 @click.option("--fmax",               type=int,     default=100)
 @click.option("--tincr",              type=float,   default=1)
@@ -39,6 +38,16 @@ base_path = os.path.dirname(__file__)
 @click.option("--data_path",          type=str,     default=os.path.join(os.environ["HOME"], "aut_gamma"))
 @click.pass_context
 def main(ctx, **kwargs):
+    if ctx.invoked_subcommand is None:
+        print("############################################################################################\n"
+              "\n   Warning : \n"
+              "\tThe program was called without a command.\n\n"
+              "\tCalling this program without a command only prepares the PSD data.\n\n"
+              "\tUse --help to list the available commands.\n\n"
+              "############################################################################################")
+
+    print(dir(ctx))
+
     ctx.obj["main"] = kwargs
 
     if six.PY3:
@@ -73,14 +82,18 @@ def main(ctx, **kwargs):
     print("--")
 
 
-@main.command()
+
+@main.command(help="- Linear classification")
 @click.argument("job_type",             type=str,         default="SVM")
 @click.pass_context
 def lc(ctx, job_type):
+    # We put the imports inside of the function to not trigger the very slow import of tensorflow
+    # even when just showing the help text, for example
+    import linear_classification
     linear_classification.linear_classification(ctx.obj["main"]["X"], ctx.obj["main"]["Y"], job_type)
 
 
-@main.command()
+@main.command(help="- Spatial classification")
 @click.argument("net_type",             default="cnn",    type=str)
 @click.option("--res",                  default=(33, 33), type=(int, int))
 @click.option("--dropout_keep_prob",    default=0.9,      type=float)
@@ -91,6 +104,7 @@ def lc(ctx, job_type):
 @click.option("--filter_scale_factor",  default=1,        type=float)
 @click.pass_context
 def sc(ctx, net_type, **kwargs):
+    import spatial_classification
     kwargs["sensor_type"] = True if kwargs["sensor_type"] == "both" else kwargs["sensor_type"]
     from_main = ctx.obj["main"] # easier to read
     spatial_classification.spatial_classification(
