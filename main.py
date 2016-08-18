@@ -13,14 +13,13 @@ import time
 import logging
 import warnings
 
-
 import utils
 import utils.data_utils
 import linear_classification
 import spatial_classification
 
-import sklearn.preprocessing
 import numpy as np
+import click
 
 """
 MNE's logger prints massive amount of useless stuff, and neither mne.set_logging_level(logging.ERROR) or
@@ -29,37 +28,25 @@ logging.basicConfig(level=logging.ERROR) seem to be working.
 logger = logging.getLogger('mne')
 logger.disabled = True
 
-def parse_args(argv):
-    p = argparse.ArgumentParser(argv)
-    p.add_argument("--nfft",              type=int,   default="1000")
-    p.add_argument("--fmax",              type=int,   default="100")
-    p.add_argument("--glob_tincr",        type=float, default="1")
-    p.add_argument("--job_class",         type=str,   default="spatial")
-    p.add_argument("--job_type",          type=str,   default="SVM")
-    p.add_argument("--established_bands",             default=False, action="store_true")
-    p.add_argument("--res",               type=tuple, default=(20, 20))
-    p.add_argument("--limit",             type=int,   default=None)
-
-    p.add_argument("-o", "--data_path", type=str, default=os.path.join(os.environ["HOME"], "aut_gamma"))
-    p.add_argument("--noverlap",        type=int, default=0)
-    p.add_argument("--glob_tmin",       type=int, default=0)
-    p.add_argument("--glob_tmax",       type=int, default=1000000)
-
-    return p.parse_args(argv[1:])
-
-# @click.group()
-# @click.option("--nfft",              default=200,   type=float)
-# @click.option("--tincr",             default=1,     type=int)
-# @click.option("--established_bands", default=False, type=bool)
-# @click.pass_context()
-def main(argv):
-    args = parse_args(argv)
+@click.group()
+@click.option("--nfft",               type=int,     default=3000)
+@click.option("--fmax",               type=int,     default=100)
+@click.option("--tincr",              type=float,   default=1)
+@click.option("--established_bands",  type=bool,    default=False)
+@click.option("--limit",              type=int,     default=None)
+@click.option("--tmin",               type=int,     default=0)
+@click.option("--tmax",               type=int,     default=1000000)
+@click.option("--noverlap",           type=int,     default=0)
+@click.option("--data_path",          type=str,     default=os.path.join(os.environ["HOME"], "aut_gamma"))
+@click.pass_context
+def main(ctx, **kwargs):
+    ctx.obj["main"] = kwargs
 
     if six.PY3:
         print("The code hasn't been tested in Python 3.\n")
 
     print("\nArgs:")
-    for key, value in six.iteritems(vars(args)):
+    for key, value in sorted(six.iteritems(ctx.obj["main"]), key=lambda k_v_pair: k_v_pair[0]):
         print("\t- {:12}: {}".format(key, value))
     print("--")
 
@@ -69,7 +56,13 @@ def main(argv):
         raise RuntimeError("Couldn't find fif_split.json. Should be generated with ./generate_split.py at the beginning"
                            " of the data exploration, and then shared.")
 
+    from argparse import Namespace
+    args = Namespace(**ctx.obj["main"])
     X, Y, sample_info = utils.data_utils.maybe_prep_psds(args)
+
+    ctx.obj["main"]["X"] = X
+    ctx.obj["main"]["Y"] = Y
+    ctx.obj["main"]["info"] = sample_info
 
     print("Dataset properties:")
     for i in xrange(3):
@@ -80,48 +73,29 @@ def main(argv):
         print("\t--")
     print("--")
 
-    ###########################################################################
-    # CLASSICAL MACHINE LEARNING CLASSIFICATION without locality
-    ###########################################################################
-    if args.job_class == "linear":
-        linear_classification.linear_classification(X, Y, args.job_type)
 
-    ###########################################################################
-    # LOCALITY PRESERVING CLASSICAL MACHINE LEARNING
-    ###########################################################################
-    # TODO
-
-    ###########################################################################
-    # VGG classical style CONVOLUTIONAL NEURAL NETWORK
-    ###########################################################################
-    # VGG: 3x3 conv, relu, 3x3 conv, relu, 3x3 conv, relu, maxpool, 3x3 conv, relu, 3x3 conv, relu, maxpool, FC, FC
-    # with batchnorm and dropout
-
-    ###########################################################################
-    # RESNET CONVOLUTIONAL NEURAL NETWORK
-    ###########################################################################
-    elif args.job_class == "spatial":
-        spatial_classification.spatial_classification(X, Y, args.res, args.nfft, args.glob_tincr,
-                                                      args.established_bands, sample_info, args.job_type)
-    else:
-        raise RuntimeError("job_class argument unsupported: {}".format(args.job_class))
+@main.command()
+@click.argument("job_type",            type=str,  default="SVM")
+@click.pass_context
+def lc(ctx, job_type):
+    linear_classification.linear_classification(ctx.obj["main"]["X"], ctx.obj["main"]["Y"], job_type)
 
 
-# @main.command()
-# @click.pass_context()
-# @linear_classification.linear_classification
+@main.command()
+@click.argument("net_type",            default="cnn",    type=str)
+@click.option("--res",                 default=(33, 33), type=(int, int))
+@click.option("--dropout_keep_prob",   default=0.9,      type=float)
+@click.option("--learning_rate",       default=0.001,    type=float)
+@click.option("--depth",               default=9,        type=int)
+@click.option("--minibatch_size",      default=128,      type=int)
+@click.option("--sensor_type",         default="both",   type=str)
+@click.option("--filter_scale_factor", default=1,        type=float)
+@click.pass_context
+def sc(ctx, net_type, **kwargs):
+    kwargs["sensor_type"] = True if kwargs["sensor_type"] == "both" else kwargs["sensor_type"]
+    from_main = ctx.obj["main"]
+    spatial_classification.spatial_classification(
+        from_main["X"], from_main["Y"], nfft=from_main["nfft"], tincr=from_main["tincr"], fmax=from_main["fmax"],
+        info=from_main["info"], established_bands=from_main["established_bands"], net_type=net_type, **kwargs)
 
-# @main.group()
-# @click.option("--res", default=(33, 33), type=(int, int))
-# @click.pass_context()
-# spatial_classification.spatial_classification
-
-# @spatial_classification.command()
-# @click.pass_context()
-# spatial_classification.cnn
-
-# @spatial_classification.command()
-# @click.pass_context()
-# spatial_classification.resnet
-
-if __name__ == "__main__": main(sys.argv)
+if __name__ == "__main__": main(obj={})

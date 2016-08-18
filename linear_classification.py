@@ -50,7 +50,7 @@ def linear_classification(x, y, job):
 
     if job == "NN":
         classifiers = [NN_models.FFNN(
-            x_shape=linear_x[0].shape, y_shape_1=2,
+            x_shape_1=linear_x[0].shape, y_shape_1=2,
             depth=1, width_hidden_layers=10,
             dropout_keep_prob=0.5, l2_c=1)]
 
@@ -98,8 +98,6 @@ def linear_classification(x, y, job):
                 n_epochs=1000000,       minibatch_size=1028,
                 learning_rate=0.0001)
         else:
-            #print("\t- Classifier:       {:30},   C={},  tol={}".format(
-            #        classifier.__class__, vars(classifier).get("C", "N/A"), vars(classifier).get("tol", "N/A")))
 
             #print("\t- Fitting the model")
             cl = classifier.fit(training_x, training_y)
@@ -110,8 +108,6 @@ def linear_classification(x, y, job):
             print("\t- Valid score:      {}".format(cl.score(valid_x, valid_y)))
             print("\t- valid avg:        {}".format(np.mean(preds_1)))
             print("\t- classif obj:      {}".format(cl))
-
-
             print("\t--")
 
 

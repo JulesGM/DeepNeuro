@@ -54,4 +54,4 @@ cleanup () {
 trap cleanup EXIT
 
 ( sleep 20 ; google-chrome 127.0.0.1:6006 ) &
-ssh helios -L 6006:127.0.0.1:$REMOTE_PORT "$CMD"
+ssh helios -R $REMOTE_PORT:127.0.0.1:6006 "$CMD"

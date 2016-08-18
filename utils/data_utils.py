@@ -10,12 +10,16 @@ import mne.io.pick
 
 import utils
 
+import copy
+
 mne.set_log_level("ERROR")
 base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)))
+
 
 class SaverLoader(object):
     def __init__(self, path):
         self._save_path = path
+
     def save_ds(self, data):
         import joblib
         joblib.dump(data, self._save_path)
@@ -38,6 +42,7 @@ def data_gen(base_path, limit = None):
     base_path = os.path.abspath(base_path)
     assert os.path.exists(base_path), "{base_path} doesn't exist".format(base_path=base_path)
     full_glob = glob.glob(base_path + "/*.fif")
+    print("Datagen found {} files".format(len(full_glob)))
 
     if len(full_glob) == 0:
         raise RuntimeError("Datagen didn't find find any '.fif' files")
@@ -52,9 +57,7 @@ def data_gen(base_path, limit = None):
     if len(fif_paths) == 0:
         raise RuntimeError("fif_path is of size zero.")
 
-    failed = 0
     for fif_path in fif_paths:
-        logging.info("Ignored ratio: {}" .format(failed / len(fif_paths)))
         name = fif_path.split("/")[-1] # os.path.split appears broken somehow
 
         # MNE generates a lot of really unnecessary blabla.
@@ -65,14 +68,14 @@ def data_gen(base_path, limit = None):
             try:
                 raw = mne.io.Raw(fif_path)
             except ValueError as err:
-                logging.error("-- data_gen ValueError:")
-                logging.error("-- %s" % name)
-                logging.error("-- %s\n" % err)
+                print("-- data_gen ValueError:")
+                print("-- %s" % name)
+                print("-- %s\n" % err)
                 raise err
             except TypeError as err:
-                logging.error("-- data_gen TypeError")
-                logging.error("-- %s" % name)
-                logging.error("-- %s\n" % err)
+                print("-- data_gen TypeError")
+                print("-- %s" % name)
+                print("-- %s\n" % err)
                 raise err
 
         assert name.lower().startswith("k") or name.lower().startswith("r"), \
@@ -106,8 +109,9 @@ def established_bands(psds, freqs):
 
 
 def maybe_prep_psds(args):
-    if args.glob_tmin != 0:
-        print("Warning: --glob_tmin is not equal to zero, this is weid. Value : {}".format(args.glob_tmin))
+    if args.tmin != 0:
+        print("Warning: --tmin is not equal to zero, this is weid. Value : {}".format(args.tmin))
+    assert args.tmax >= 40, "tmax is smaller than 40, it's unlikely that that was intended"
 
     ###########################################################################
     # FEATURE PREPARATION
@@ -127,11 +131,18 @@ def maybe_prep_psds(args):
                          "test":      2,
                          }
 
-    X = [None, None, None]
+    # Empty folders aren't saved by git
+    saves_folder = os.path.join(base_path, "saves")
+    if not os.path.exists(saves_folder):
+        os.mkdir(saves_folder)
+    psd_saves_path = os.path.join(saves_folder, "ds_transform_saves")
+    if not os.path.exists(psd_saves_path):
+        os.mkdir(psd_saves_path)
 
     # We build savepaths from different values of the parameters
-    saver_loader = SaverLoader(os.path.join(base_path, "saves/ds_transform_saves/{eb}_{fmax}_{limit}_{tincr}_{nfft}_latest_save.pkl" \
-                              .format(eb="eb_" if args.established_bands else "", fmax=args.fmax, limit=args.limit, tincr=args.glob_tincr, nfft=args.nfft)))
+    saver_loader = SaverLoader(os.path.join(psd_saves_path, "{eb}_{fmax}_{limit}_{tincr}_{nfft}_latest_save.pkl" \
+                              .format(eb="eb_" if args.established_bands else "", fmax=args.fmax, limit=args.limit,
+                                      tincr=args.tincr, nfft=args.nfft)))
 
     if saver_loader.save_exists():
         print("Loading pickled dataset")
@@ -147,10 +158,10 @@ def maybe_prep_psds(args):
 
             split_idx = split_idx_to_name[fif_split[name]]
 
-            lower_bound = args.glob_tmin * 1000
-            increment = int(args.glob_tincr * 1000)
-            # we ignore GLOB_TMAX_s if it's later than the end of the measure
-            delta = min(raw.n_times, args.glob_tmax * 1000) - lower_bound
+            lower_bound = args.tmin * 1000
+            increment = int(args.tincr * 1000)
+            # we ignore args.tmax if it's later than the end of the measure
+            delta = min(raw.n_times, args.tmax * 1000) - lower_bound
             # The upper bound is the largest number of samples that allows for complete non overlapping PSD evaluation windows
             # It's the total number of samples minus the rest of the division of the total number of samples by the PSD
             # evaluation window width (the mod).
@@ -160,7 +171,7 @@ def maybe_prep_psds(args):
             # if you start at 0h10,
             # you will be done at
             # 0h10 + 45 - 45 % 10 = 0h50 (this last part is pretty obvious)
-            upper_bound = lower_bound + delta - delta % int(args.glob_tincr * 1000)
+            upper_bound = lower_bound + delta - delta % int(args.tincr * 1000)
 
             for j, psd_band_t_start_ms in enumerate(xrange(lower_bound, upper_bound, increment)):
                 """
@@ -183,13 +194,13 @@ def maybe_prep_psds(args):
                                            n_fft=args.nfft,
                                            n_overlap=args.noverlap,
                                            tmin=psd_band_t_start_ms / 1000.,
-                                           tmax=psd_band_t_start_ms / 1000. + args.glob_tincr,
+                                           tmax=psd_band_t_start_ms / 1000. + args.tincr,
                                            fmax=(min(100, args.fmax) if args.established_bands else args.fmax),
                                            verbose="INFO"
                                            )
 
                 if args.established_bands:
-                    num_res_db = established_bands(psds, freqs)
+                    psds = established_bands(psds, freqs)
 
                 num_res_db = 10 * np.log10(psds)
 
@@ -202,11 +213,14 @@ def maybe_prep_psds(args):
                 list_x[split_idx].append(num_res_db)
                 Y[split_idx].append(label)
 
-                if freqs_bands is None:
-                    freqs_bands = freqs
-
-        print("")
+        assert len(list_x) == 3
         assert len(Y) == 3
+
+        # Make sure we have samples in each of the cross validation sets
+        x_lens = [len(_x) for _x in list_x]
+        for i, x_len in enumerate(x_lens):
+            print((i, x_len))
+            assert x_len > 0, "cross validation set #{} of x is empty. ".format(i)
 
         for i in xrange(3):
             X[i] = np.dstack(list_x[i])
@@ -220,13 +234,11 @@ def maybe_prep_psds(args):
             assert len(X[i].shape) == utils.X_Dims.size.value
             assert X[i].shape[utils.X_Dims.samples_and_times.value] == Y[i].shape[0], X[i].shape[utils.X_Dims.samples_and_times.value]  # no_samples
             assert X[i].shape[utils.X_Dims.sensors.value] == 306, X[i].shape[utils.X_Dims.sensors.value]  # sensor no
-
-        # Verify that all values are good
-        for i in xrange(3):
             assert np.all(np.isfinite(X[i]))
 
-        # Take any valid file's position information, as all raws [are supposed to] have the same positions
-        info = next(data_gen(args.data_path))[1].info
+        # Take any valid file's position information, as all raws [are supposed to] have the same positions.
+        # Deep copying it allows the garbage collector to release the raw file. Not major at all.. but still.
+        info = copy.deepcopy(next(data_gen(args.data_path))[1].info)
         print("--")
         print("Saving the newly generated dataset")
         saver_loader.save_ds((X, Y, info))

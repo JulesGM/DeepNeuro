@@ -118,8 +118,9 @@ def make_interpolated_data(x, res, method, sample_info, sensor_type=True, show=F
 
         for sample_idx_per_set in xrange(sample_bound):
             if sample_idx_per_set % 5 == 0:
-                sys.stdout.write("\rk: '{}', i: {} of {} ({:4.2f} %))".format(
+                sys.stdout.write("\r\t- cv set: '{}', sample: {} of {} ({:4.2f} %))".format(
                     sample_set_idx, sample_idx_per_set, sample_bound, 100 * sample_idx_per_set / sample_bound))
+                sys.stdout.flush()
             for fft_channel_idx in xrange(fft_bound):
                 psd_image = scipy.interpolate.griddata(
                     sensor_positions, x[sample_set_idx][sample_idx_per_set, fft_channel_idx, picks], grid, method, 0)
@@ -132,4 +133,4 @@ def make_interpolated_data(x, res, method, sample_info, sensor_type=True, show=F
         assert np.all(np.isfinite(interp_x[sample_set_idx]))
         interp_x[sample_set_idx] = np.swapaxes(np.swapaxes(interp_x[sample_set_idx], 1, 2), 2, 3)
 
-    return interp_x, str(abs((res, method, sensor_type).__hash__()))
+    return interp_x
