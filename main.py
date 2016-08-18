@@ -80,7 +80,6 @@ def main(ctx, **kwargs):
     print("--")
 
 
-
 @main.command(help="- Linear classification")
 @click.argument("job_type",             type=str,         default="SVM")
 @click.pass_context

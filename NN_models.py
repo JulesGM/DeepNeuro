@@ -51,7 +51,7 @@ class CNN(NN_utils.AbstractClassifier):
         self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
         self._lr = tf.placeholder(tf.float32, name="learning_rate")
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
-        filter_scale_factor = tf.constant(filter_scale_factor, name="filter_scale_factor")
+
 
         net = self._x
         for _ in xrange(depth):
@@ -74,7 +74,7 @@ class ResNet(NN_utils.AbstractClassifier):
         self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
         self._lr = tf.placeholder(tf.float32, name="learning_rate")
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
-        filter_scale_factor = tf.constant(filter_scale_factor, name="filter_scale_factor")
+
 
         net = self._x
         for _ in xrange(depth):
