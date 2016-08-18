@@ -46,8 +46,6 @@ def main(ctx, **kwargs):
               "\tUse --help to list the available commands.\n\n"
               "############################################################################################")
 
-    print(dir(ctx))
-
     ctx.obj["main"] = kwargs
 
     if six.PY3:
@@ -98,7 +96,7 @@ def lc(ctx, job_type):
 @click.option("--res",                  default=(33, 33), type=(int, int))
 @click.option("--dropout_keep_prob",    default=0.9,      type=float)
 @click.option("--learning_rate",        default=0.001,    type=float)
-@click.option("--depth",                default=9,        type=int)
+@click.option("--depth",                default=3,        type=int)
 @click.option("--minibatch_size",       default=128,      type=int)
 @click.option("--sensor_type",          default="both",   type=str)
 @click.option("--filter_scale_factor",  default=1,        type=float)

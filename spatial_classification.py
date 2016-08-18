@@ -7,6 +7,7 @@ from six.moves import zip as izip
 # Stdlib
 import os
 import sys
+import random
 
 # Own
 import utils
@@ -18,6 +19,7 @@ import numpy as np
 import scipy.interpolate
 from matplotlib import pyplot as plt
 import mne
+
 
 base_path = os.path.dirname(__file__)
 
@@ -69,10 +71,10 @@ def make_interpolated_data(x, res, method, sample_info, sensor_type=True, show=F
     return interp_x
 
 
-def make_image_save_name(res, sensor_type, nfft, fmax, tincr, use_established_bands):
+def _make_image_save_name(res, sensor_type, nfft, fmax, tincr, use_established_bands):
     # we right them all, on purpose, instead of using *args, to make sure everything is in its place
     args = [res, sensor_type, nfft, fmax, tincr, use_established_bands]
-    return "_".join([str(x) for x in args]) + ".pkl"
+    return "_".join([str(x) for x in args])
 
 
 def spatial_classification(x, y,  nfft, tincr, fmax, info, established_bands,  res, sensor_type,  net_type,
@@ -82,7 +84,7 @@ def spatial_classification(x, y,  nfft, tincr, fmax, info, established_bands,  r
     if not os.path.exists(saves_loc):
         os.mkdir(saves_loc)
 
-    image_save_name = make_image_save_name(res, sensor_type, nfft, tincr, fmax, established_bands)
+    image_save_name = _make_image_save_name(res, sensor_type, nfft, tincr, fmax, established_bands) + ".pkl"
     saver_loader = utils.data_utils.SaverLoader(os.path.join(saves_loc, image_save_name))
 
     if saver_loader.save_exists():
@@ -106,15 +108,20 @@ def spatial_classification(x, y,  nfft, tincr, fmax, info, established_bands,  r
 
     if net_type == "cnn":
         print("cnn")
+
+        summary_path = os.path.join(base_path, "saves", "tf_summaries", "cnn_" + image_save_name + "_" +
+                                    str(random.randint(0, 1000000000000)))
         model = NN_models.CNN(x_shape, y_shape_1, depth=depth, dropout_keep_prob=dropout_keep_prob,
-                              filter_scale_factor=filter_scale_factor)
+                              filter_scale_factor=filter_scale_factor, summary_writing_path=summary_path)
         model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y, n_epochs=10000000,
                               minibatch_size=minibatch_size, learning_rate=learning_rate)
 
     elif net_type == "resnet":
         print("resnet")
+        summary_path = os.path.join(base_path, "saves", "tf_summaries", "resnet_" + image_save_name + "_" +
+                                    str(random.randint(0, 1000000000000)))
         model = NN_models.ResNet(x_shape, y_shape_1, depth=depth, dropout_keep_prob=dropout_keep_prob,
-                                 filter_scale_factor=filter_scale_factor)
+                                 filter_scale_factor=filter_scale_factor, summary_writing_path=summary_path)
         model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y,
                   n_epochs=10000000, minibatch_size=minibatch_size, learning_rate=learning_rate)
     else:

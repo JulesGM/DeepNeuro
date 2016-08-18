@@ -195,7 +195,10 @@ class AbstractClassifier(object):
 
     def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate, verbose=True):
         with tf.Session() as sess:
+            if not os.path.exists(self.summary_writing_path):
+                os.path.mkdir(self.summary_writing_path)
             assert os.path.exists(self.summary_writing_path)
+
             training_writer   = tf.train.SummaryWriter(self.summary_writing_path + "/train", sess.graph)
             validation_writer = tf.train.SummaryWriter(self.summary_writing_path + "/valid", sess.graph)
             sess.run([tf.initialize_all_variables()])

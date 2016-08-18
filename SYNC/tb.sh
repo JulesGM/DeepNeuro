@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 
-d_TARGET=helios
+d_REMOTE_PORT=9292
+
 if [[ -n $1 ]] ; then
-    TARGET="$1";
+    REMOTE_PORT="$1";
     echo -e '$TARGET'" = $1\n"
+else
+    echo -e 'Defaulting to $REMOTE_PORT='"$d_REMOTE_PORT"
+    REMOTE_PORT=$d_REMOTE_PORT
+fi
+
+
+d_TARGET=helios
+if [[ -n $2 ]] ; then
+    TARGET="$2";
+    echo -e '$TARGET'" = $2\n"
 else
     echo -e 'Defaulting to $TARGET='"$d_TARGET"
     TARGET=$d_TARGET
@@ -24,7 +35,6 @@ else
 fi
 
 
-REMOTE_PORT=8888
 
 VENV=/home/julesgm/COCO/FAKE_SCRATCH/myenv/bin/activate
 CMD="
@@ -54,4 +64,6 @@ cleanup () {
 trap cleanup EXIT
 
 ( sleep 20 ; google-chrome 127.0.0.1:6006 ) &
-ssh helios -R $REMOTE_PORT:127.0.0.1:6006 "$CMD"
+ssh helios -L 6006:127.0.0.1:$REMOTE_PORT "$CMD"
+#ssh helios -R $REMOTE_PORT:127.0.0.1:6006 "$CMD" -o TCPKeepAlive=yes
+#ssh helios -R 8888:127.0.0.1:6006 -o TCPKeepAlive=yes

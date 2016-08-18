@@ -1,0 +1,26 @@
+files="$(git rev-list --all --objects | \
+    sed -n $(git rev-list --objects --all | \
+    cut -f1 -d' ' | \
+    git cat-file --batch-check | \
+    grep blob | \
+    sort -n -k 3 | \
+    tail -n1 | \
+    while read hash type size; do
+         echo -n "-e s/$hash/$size/p ";
+    done) | \
+    sort -n -k1)"
+
+readarray -t array <<<"$files"
+
+
+for x in ${files} ; do if [[ ! "$x" =~ ^[0-9]+$ ]] ; then
+  git filter-branch -f  --index-filter \
+      "git rm --force --cached --ignore-unmatch $x" \
+       -- --all
+  rm -Rf .git/refs/original && \
+      git reflog expire --expire=now --all
+      #&& \
+      git gc --aggressive && \
+      git prune
+fi ;
+done
