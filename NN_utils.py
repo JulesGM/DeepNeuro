@@ -42,7 +42,7 @@ def relu_layer(input_, shape):
         with tf.name_scope("activations"):
             a = tf.matmul(input_, w) + b
         h = tf.nn.relu(a)
-    return h, (w, b)
+    return h
 
 
 def conv_layer(input_, filter_shape, stride):
@@ -150,7 +150,6 @@ class AbstractClassifier(object):
         """
         Only ran from AbstractClassifier.fit. Basically, the logging done for each cross-validation set
         """
-
         # kinda tricky: the inside of this function is pretty slow, so we only want to print after
         # we've been over it's two executions before clearing the screen and displaying the results,
         # so each results stays on the screen for a longuer time
@@ -193,6 +192,7 @@ class AbstractClassifier(object):
             print_later("\t- {} prediction counts: {}".format(cv_set, res_counts))
 
         return "\n".join(print_later_text_list)
+
     def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate, verbose=True):
         with tf.Session() as sess:
             assert os.path.exists(self.summary_writing_path)
