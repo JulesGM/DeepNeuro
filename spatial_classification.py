@@ -41,7 +41,7 @@ def make_interpolated_data(x, res, method, sample_info, sensor_type=True, show=F
     ## picks = mne.channels.layout._pair_grad_sensors(sample_info)
     ## x = mne.channels.layout._merge_grad_data(x[picks])
 
-    for sample_set_idx in xrange(2): # There is currently no reason to do the test set. it being hardcoded is really poor,
+    for sample_set_idx in xrange(2): # There is currently no reason to do the test set. it being hardcoded is not ideal,
                                      # but such is life
         interp_x[sample_set_idx] = np.empty([x[sample_set_idx].shape[utils.X_Dims.samples_and_times.value],
                                              x[sample_set_idx].shape[utils.X_Dims.fft_ch.value], res[0], res[1]],
@@ -101,12 +101,8 @@ def spatial_classification(x, y,  nfft, tincr, fmax, info, established_bands,  r
     validation_prepared_x = prepared_x[1]
     validation_y = y[1]
 
-    # print(training_prepared_x)
     x_shape = training_prepared_x.shape
     y_shape_1 = training_y.shape[1]
-
-    print(x_shape)
-    print(y_shape_1)
 
     if net_type == "cnn":
         print("cnn")
