@@ -1,23 +1,21 @@
 #! /usr/bin/env python
-# Compatibility imports
+# compatibility imports
 from __future__ import with_statement, print_function, division
 import six
 from six.moves import range as xrange
 from six.moves import zip as izip
 
-# stdlib usual imports
-import sys
+# stdlib imports
 import os
-import argparse
-import time
 import logging
-import warnings
 
+# local imports
 import utils
 import utils.data_utils
 import linear_classification
 import spatial_classification
 
+# external imports
 import numpy as np
 import click
 
@@ -27,6 +25,7 @@ logging.basicConfig(level=logging.ERROR) seem to be working.
 """
 logger = logging.getLogger('mne')
 logger.disabled = True
+base_path = os.path.dirname(__file__)
 
 @click.group()
 @click.option("--nfft",               type=int,     default=3000)
@@ -50,7 +49,7 @@ def main(ctx, **kwargs):
         print("\t- {:12}: {}".format(key, value))
     print("--")
 
-    json_split_path = "./fif_split.json"
+    json_split_path = os.path.join(base_path, "fif_split.json")
 
     if not os.path.exists(json_split_path):
         raise RuntimeError("Couldn't find fif_split.json. Should be generated with ./generate_split.py at the beginning"
@@ -75,25 +74,25 @@ def main(ctx, **kwargs):
 
 
 @main.command()
-@click.argument("job_type",            type=str,  default="SVM")
+@click.argument("job_type",             type=str,         default="SVM")
 @click.pass_context
 def lc(ctx, job_type):
     linear_classification.linear_classification(ctx.obj["main"]["X"], ctx.obj["main"]["Y"], job_type)
 
 
 @main.command()
-@click.argument("net_type",            default="cnn",    type=str)
-@click.option("--res",                 default=(33, 33), type=(int, int))
-@click.option("--dropout_keep_prob",   default=0.9,      type=float)
-@click.option("--learning_rate",       default=0.001,    type=float)
-@click.option("--depth",               default=9,        type=int)
-@click.option("--minibatch_size",      default=128,      type=int)
-@click.option("--sensor_type",         default="both",   type=str)
-@click.option("--filter_scale_factor", default=1,        type=float)
+@click.argument("net_type",             default="cnn",    type=str)
+@click.option("--res",                  default=(33, 33), type=(int, int))
+@click.option("--dropout_keep_prob",    default=0.9,      type=float)
+@click.option("--learning_rate",        default=0.001,    type=float)
+@click.option("--depth",                default=9,        type=int)
+@click.option("--minibatch_size",       default=128,      type=int)
+@click.option("--sensor_type",          default="both",   type=str)
+@click.option("--filter_scale_factor",  default=1,        type=float)
 @click.pass_context
 def sc(ctx, net_type, **kwargs):
     kwargs["sensor_type"] = True if kwargs["sensor_type"] == "both" else kwargs["sensor_type"]
-    from_main = ctx.obj["main"]
+    from_main = ctx.obj["main"] # easier to read
     spatial_classification.spatial_classification(
         from_main["X"], from_main["Y"], nfft=from_main["nfft"], tincr=from_main["tincr"], fmax=from_main["fmax"],
         info=from_main["info"], established_bands=from_main["established_bands"], net_type=net_type, **kwargs)
