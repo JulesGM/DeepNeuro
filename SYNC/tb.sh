@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 
-d_REMOTE_PORT=9292
+LOGDIR=$1
+if [[ -z $1 ]] ; then
+    echo -e "Haven't received a logdir, the first argument. We need a logdir:\n[ls /home/julesgm/COCO/saves/tf_summaries]"
+    ssh helios ls -d -1 '~/COCO/saves/tf_summaries/*'
+    ssh helios ls -d -1 '~/COCO/saves/*'
+    exit
+fi
 
-if [[ -n $1 ]] ; then
-    REMOTE_PORT="$1";
-    echo -e '$TARGET'" = $1\n"
+d_REMOTE_PORT=9292
+if [[ -n $2 ]] ; then
+    REMOTE_PORT="$2";
+    echo -e '$TARGET'" = $2\n"
 else
     echo -e 'Defaulting to $REMOTE_PORT='"$d_REMOTE_PORT"
     REMOTE_PORT=$d_REMOTE_PORT
@@ -12,9 +19,9 @@ fi
 
 
 d_TARGET=helios
-if [[ -n $2 ]] ; then
-    TARGET="$2";
-    echo -e '$TARGET'" = $2\n"
+if [[ -n $3 ]] ; then
+    TARGET="$3";
+    echo -e '$TARGET'" = $3\n"
 else
     echo -e 'Defaulting to $TARGET='"$d_TARGET"
     TARGET=$d_TARGET

@@ -95,7 +95,7 @@ def lc(ctx, job_type):
 @click.argument("net_type",             default="cnn",    type=str)
 @click.option("--res",                  default=(33, 33), type=(int, int))
 @click.option("--dropout_keep_prob",    default=0.9,      type=float)
-@click.option("--learning_rate",        default=0.001,    type=float)
+@click.option("--learning_rate",        default=0.0001,    type=float)
 @click.option("--depth",                default=3,        type=int)
 @click.option("--minibatch_size",       default=128,      type=int)
 @click.option("--sensor_type",          default="both",   type=str)
