@@ -2,6 +2,7 @@
 .pkl
 saves/*
 fif_split.json
+.idea
 
 ########################
 # After this point, take from 
