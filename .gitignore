@@ -1,10 +1,7 @@
-# .mp4 generated videos
-*.mp4
-# .fiff files.. not currently, eventually though
-# *.fiff
-
-
-
+.mp4
+.pkl
+saves/*
+fif_split.json
 
 ########################
 # After this point, take from 
