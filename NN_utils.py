@@ -70,7 +70,7 @@ def conv_layer(input_, filter_shape, stride):
     return out
 
 
-def max_pool(bottom, name):
+def max_pool(bottom, name=None):
     return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
 

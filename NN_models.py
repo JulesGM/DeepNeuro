@@ -42,8 +42,8 @@ class FFNN(NN_utils.AbstractClassifier):
 
 
 class CNN(NN_utils.AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob, filter_scale_factor,
-                 summary_writing_path=default_summary_path):
+    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob, filter_scale_factor, first_layer_scale_factor=2,
+                 pool_every_k=3, summary_writing_path=default_summary_path):
         super(self.__class__, self).__init__(summary_writing_path)
 
         self.dropout_keep_prob = dropout_keep_prob
@@ -54,13 +54,18 @@ class CNN(NN_utils.AbstractClassifier):
 
 
         net = self._x
-        for _ in xrange(depth):
+        for i in xrange(depth):
             input_depth = net.get_shape().as_list()[3]
-            output_depth = int(input_depth * filter_scale_factor)
+            if i == 0:
+                output_depth = input_depth * first_layer_scale_factor
+            else:
+                output_depth = int(input_depth * filter_scale_factor)
+
             filter_shape = (3, 3, input_depth, output_depth)
             net = NN_utils.conv_layer(net, filter_shape, 1)
             net = tf.nn.dropout(net, self._dropout_keep_prob)
-
+            if pool_every_k is not None and (i + 1) % pool_every_k == 0 and i != 0:
+                net = NN_utils.max_pool(net)
         self.finish_init(net, y_shape_1)
 
 
@@ -74,7 +79,6 @@ class ResNet(NN_utils.AbstractClassifier):
         self._y = tf.placeholder(tf.float32, shape=[None, y_shape_1], name="y")
         self._lr = tf.placeholder(tf.float32, name="learning_rate")
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
-
 
         net = self._x
         for _ in xrange(depth):

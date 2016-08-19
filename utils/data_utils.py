@@ -150,7 +150,6 @@ def maybe_prep_psds(args):
         print("--")
     else:
         print("Generating the dataset from the raw (.fif) files")
-        freqs_bands = None
         list_x = [[], [], []]
 
         for i, (name, raw, label, total) in enumerate(data_gen(args.data_path, args.limit)):

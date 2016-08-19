@@ -27,7 +27,7 @@ logger.disabled = True
 base_path = os.path.dirname(__file__)
 
 @click.group(invoke_without_command=True)
-@click.option("--nfft",               type=int,     default=3000)
+@click.option("--nfft",               type=int,     default=500)
 @click.option("--fmax",               type=int,     default=100)
 @click.option("--tincr",              type=float,   default=1)
 @click.option("--established_bands",  type=bool,    default=False)
@@ -92,13 +92,14 @@ def lc(ctx, job_type):
 
 @main.command(help="- Spatial classification")
 @click.argument("net_type",             default="cnn",    type=str)
-@click.option("--res",                  default=(15, 15), type=(int, int))
-@click.option("--dropout_keep_prob",    default=0.9,      type=float)
-@click.option("--learning_rate",        default=0.00001,    type=float)
+@click.option("--res",                  default=(70, 70), type=(int, int))
+@click.option("--dropout_keep_prob",    default=1,        type=float)
+@click.option("--learning_rate",        default=0.00001,  type=float)
 @click.option("--depth",                default=6,        type=int)
-@click.option("--minibatch_size",       default=64,      type=int)
+@click.option("--minibatch_size",       default=64,       type=int)
 @click.option("--sensor_type",          default="both",   type=str)
-@click.option("--filter_scale_factor",  default=1.5,        type=float)
+@click.option("--filter_scale_factor",  default=2,        type=float)
+
 @click.pass_context
 def sc(ctx, net_type, **kwargs):
     import spatial_classification
