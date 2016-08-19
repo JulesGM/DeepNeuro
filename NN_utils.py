@@ -45,20 +45,28 @@ def relu_layer(input_, shape):
     return h
 
 
-def conv_layer(input_, filter_shape, stride):
-    with tf.name_scope("conv_layer"):
+def bn_conv_layer(input_, filter_shape, stride):
+    with tf.name_scope("bn_conv_layer"):
         out_channels = filter_shape[3]
         filter_ = weight_variable(filter_shape)
         conv = tf.nn.conv2d(input_, filter=filter_, strides=[1, stride, stride, 1], padding="SAME")
         mean, var = tf.nn.moments(conv, axes=[0, 1, 2])
         beta = tf.Variable(tf.zeros([out_channels]), name="beta")
         gamma = weight_variable([out_channels], name="gamma")
-
         batch_norm = tf.nn.batch_norm_with_global_normalization(
             conv, mean, var, beta, gamma, 0.001,
             scale_after_normalization=True)
-
         out = tf.nn.relu(batch_norm)
+    return out
+
+def conv_layer(input_, filter_shape, stride):
+    with tf.name_scope("conv_layer"):
+        filter_ = weight_variable(filter_shape)
+        biais_ = biais_variable([filter_shape[3]])
+        conv = tf.nn.conv2d(input_, filter=filter_, strides=[1, stride, stride, 1], padding="SAME")
+        with tf.name_scope("activation"):
+            activation = tf.nn.bias_add(conv, biais_)
+        out = tf.nn.relu(activation)
     return out
 
 
@@ -74,16 +82,16 @@ def residual_block(input_, output_depth, down_sample, projection=False):
             input_ = tf.nn.max_pool(input_, ksize=filter_, strides=filter_, padding='SAME')
 
         filters = []
-        conv1 = conv_layer(input_, [3, 3, input_depth, output_depth], 1)
+        conv1 = bn_conv_layer(input_, [3, 3, input_depth, output_depth], 1)
         filters.append(filter)
 
-        conv2 = conv_layer(conv1, [3, 3, output_depth, output_depth], 1)
+        conv2 = bn_conv_layer(conv1, [3, 3, output_depth, output_depth], 1)
         filters.append(filter)
 
         if input_depth != output_depth:
             if projection:
                 # Option B: Projection shortcut
-                input_layer = conv_layer(input_, [1, 1, input_depth, output_depth], 2)
+                input_layer = bn_conv_layer(input_, [1, 1, input_depth, output_depth], 2)
             else:
                 # Option A: Zero-padding
                 input_layer = tf.pad(input_, [[0, 0], [0, 0], [0, 0], [0, output_depth - input_depth]])
@@ -180,9 +188,9 @@ class AbstractClassifier(object):
 
         if verbose:
             print_later("\t{} summary:".format(cv_set))
-            print_later(labels[:10])
-            print_later(predictions[:10])
-            print_later(right_predictions[:10])
+            # print_later(labels[:10])
+            # print_later(predictions[:10])
+            # print_later(right_predictions[:10])
             print_later("\t- {} accuracy:  {}".format(cv_set, accuracy))
             print_later("\t- {} loss:      {}".format(cv_set, loss))
             print_later("\t- {} l2:        {}".format(cv_set, l2))

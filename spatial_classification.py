@@ -59,7 +59,7 @@ def make_interpolated_data(x, res, method, sample_info, sensor_type=True, show=F
     ## x = mne.channels.layout._merge_grad_data(x[picks])
 
 
-    with joblib.Parallel(n_jobs=14,
+    with joblib.Parallel(n_jobs=32,
                          backend="threading",
                          #backend="multiprocessing", mmap_mode="r+",
                          ) as pool:
