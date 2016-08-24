@@ -2,15 +2,23 @@ from __future__ import print_function, generators, division, with_statement
 from six import iteritems
 from six.moves import zip as izip, range as xrange
 
-import os, sys, glob, warnings, logging, json
-import numpy as np
+# Stdlib
+import os
+import sys
+import glob
+import warnings
+import logging
+import json
+import time
+import copy
 
-import mne
-import mne.io.pick
-
+# Own
 import utils
 
-import copy
+# External
+import numpy as np
+import mne
+import mne.io.pick
 
 mne.set_log_level("ERROR")
 base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)))
@@ -107,7 +115,6 @@ def established_bands(psds, freqs):
 
     return data
 
-
 def maybe_prep_psds(args):
     if args.tmin != 0:
         print("Warning: --tmin is not equal to zero, this is weid. Value : {}".format(args.tmin))
@@ -152,7 +159,10 @@ def maybe_prep_psds(args):
         print("Generating the dataset from the raw (.fif) files")
         list_x = [[], [], []]
 
+        shape = None
+
         for i, (name, raw, label, total) in enumerate(data_gen(args.data_path, args.limit)):
+            start_t = time.time()
             files_lim = total if args.limit is None or total > args.limit else args.limit
 
             split_idx = split_idx_to_name[fif_split[name]]
@@ -182,21 +192,23 @@ def maybe_prep_psds(args):
                 keeping our precision.
                 """
                 if j % 10 == 0:
-                    sys.stdout.write("\r\t- File {} of {} (max: {}) - Segment {:7} of {:7}, {:<4.2f}%".format(
-                        i + 1, files_lim, total,
-                        str(psd_band_t_start_ms), str(upper_bound), 100 * psd_band_t_start_ms / upper_bound))
+                    sys.stderr.write("\r\t- File {current} of {files_lim} (max: {max_possible}) - Segment {seg_start:7}"
+                                     " of {seg_end:7}, {percentage:<4.2f}%".format(
+                                        current=i + 1, files_lim=files_lim, max_possible=total,
+                                        seg_start=str(psd_band_t_start_ms), seg_end=str(upper_bound),
+                                        percentage=100 * psd_band_t_start_ms / upper_bound))
+                    sys.stderr.flush()
 
-                psds, freqs = mne.time_frequency.psd_welch(
-                                           n_jobs=1, # in our tests, more jobs invariably resulted in slower execution, even on the 32 cores xeons of the Helios cluster.
-                                           inst=raw,
-                                           picks=mne.pick_types(raw.info, meg=True),
-                                           n_fft=args.nfft,
-                                           n_overlap=args.noverlap,
-                                           tmin=psd_band_t_start_ms / 1000.,
-                                           tmax=psd_band_t_start_ms / 1000. + args.tincr,
-                                           fmax=(min(100, args.fmax) if args.established_bands else args.fmax),
-                                           verbose="INFO"
-                                           )
+                psds, freqs = mne.time_frequency.psd_welch(n_jobs=1, # in our tests, more jobs invariably resulted in slower execution, even on the 32 cores xeons of the Helios cluster.
+                                     inst=raw,
+                                     picks=mne.pick_types(raw.info, meg=True),
+                                     n_fft=args.nfft,
+                                     n_overlap=args.noverlap,
+                                     tmin=psd_band_t_start_ms / 1000.,
+                                     tmax=psd_band_t_start_ms / 1000. + args.tincr,
+                                     fmax=(min(100, args.fmax) if args.established_bands else args.fmax),
+                                     verbose="INFO"
+                                     )
 
                 if args.established_bands:
                     psds = established_bands(psds, freqs)
@@ -204,13 +216,23 @@ def maybe_prep_psds(args):
                 num_res_db = 10 * np.log10(psds)
 
                 if not np.all(np.isfinite(num_res_db)):
-                    print("\n>>>>>>>>> {} : has a NAN or INF or NINF post log - skipping this segment ({}:{})\n" \
+                    sys.stderr.write("\n>>>>>>>>> {} : has a NAN or INF or NINF post log - skipping this segment ({}:{})\n" \
                           .format(name, psd_band_t_start_ms, upper_bound))
-
+                    sys.stderr.flush()
                     continue
+
+
+                if shape is None:
+                    print(num_res_db.shape)
+
+                if shape != num_res_db.shape:
+                    print("from {} to {}".format(shape, num_res_db.shape))
+                    shape = num_res_db.shape
 
                 list_x[split_idx].append(num_res_db)
                 Y[split_idx].append(label)
+
+            sys.stderr.write("\ntime: {} s\n".format(time.time() - start_t))
 
         assert len(list_x) == 3
         assert len(Y) == 3

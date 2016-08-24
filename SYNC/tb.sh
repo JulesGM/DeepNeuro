@@ -3,8 +3,8 @@
 LOGDIR=$1
 if [[ -z $1 ]] ; then
     echo -e "Haven't received a logdir, the first argument. We need a logdir:\n[ls /home/julesgm/COCO/saves/tf_summaries]"
-    ssh helios ls -d -1 '~/COCO/saves/tf_summaries/*'
-    ssh helios ls -d -1 '~/COCO/saves/*'
+    ssh helios ls -lt -d -1 '~/COCO/saves/tf_summaries/*'
+    ssh helios ls -lt -d -1 '~/COCO/saves/*'
     exit
 fi
 
@@ -40,7 +40,6 @@ else
     echo "Please specify a valid TARGET. Got \"$TARGET\"."
     exit
 fi
-
 
 
 VENV=/home/julesgm/COCO/FAKE_SCRATCH/myenv/bin/activate
