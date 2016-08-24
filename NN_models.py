@@ -159,7 +159,7 @@ class ResNet(NN_utils.AbstractClassifier):
 
         def easy_conv(net, n_out):
             n_in = net.get_shape()[-1].value  # this is the way we should also be doing it
-            return NN_utils.bn_conv_layer(net, (3, 3, n_in, n_out), 1, lambda a: tf.maximum(0.2 * a, a))
+            return NN_utils.bn_conv_layer(net, (3, 3, n_in, n_out), 1, NN_utils.leaky_relu)
 
         self.dropout_keep_prob = dropout_keep_prob
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1], x_shape[2], x_shape[3]], name="x")
@@ -169,7 +169,7 @@ class ResNet(NN_utils.AbstractClassifier):
 
         net = self._x
         net = easy_conv(net, 16)
-        NN_utils.residual_block(net, 16, True, non_lin=lambda a: tf.maximum(0.2 * a, a)) # leaky relu
+        NN_utils.residual_block(net, 16, True, non_lin=NN_utils.leaky_relu)
         # NN_utils.residual_block(net, 32, True, non_lin=lambda a: tf.maximum(0.2 * a, a))
         top = tf.reduce_mean(net, [1, 2])
 

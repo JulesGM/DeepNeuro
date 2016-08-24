@@ -13,6 +13,11 @@ import utils
 
 import humanize
 
+
+def leaky_relu(activation, alpha=0.01):
+    return tf.maximum(alpha * activation, activation)
+
+
 def weight_variable(shape, name="weights"):
     # https://arxiv.org/abs/1502.01852
     # http://cs231n.github.io/neural-networks-2/
