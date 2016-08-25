@@ -19,7 +19,7 @@ import utils
 import numpy as np
 import mne
 import mne.io.pick
-
+from mne.channels.layout import find_layout, _merge_grad_data, _pair_grad_sensors
 mne.set_log_level("ERROR")
 base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)))
 
@@ -124,8 +124,8 @@ def maybe_prep_psds(args):
     # FEATURE PREPARATION
     ###########################################################################
 
-    X = [None, None, None] # Generated PSDs
-    Y = [[], [], []] # Generated labels
+    x = [None, None, None] # Generated PSDs
+    y = [[], [], []] # Generated labels
 
     base_path = os.path.dirname(os.path.dirname(__file__))
     json_path = os.path.join(base_path, "fif_split.json")
@@ -153,7 +153,7 @@ def maybe_prep_psds(args):
 
     if saver_loader.save_exists():
         print("Loading pickled dataset")
-        X, Y, info = saver_loader.load_ds()
+        x, y, info = saver_loader.load_ds()
         print("--")
     else:
         print("Generating the dataset from the raw (.fif) files")
@@ -199,6 +199,8 @@ def maybe_prep_psds(args):
                                         percentage=100 * psd_band_t_start_ms / upper_bound))
                     sys.stderr.flush()
 
+
+
                 psds, freqs = mne.time_frequency.psd_welch(n_jobs=1, # in our tests, more jobs invariably resulted in slower execution, even on the 32 cores xeons of the Helios cluster.
                                      inst=raw,
                                      picks=mne.pick_types(raw.info, meg=True),
@@ -209,6 +211,10 @@ def maybe_prep_psds(args):
                                      fmax=(min(100, args.fmax) if args.established_bands else args.fmax),
                                      verbose="INFO"
                                      )
+
+                if args.sensor_type == "grad":
+                    #picks, pos = _pair_grad_sensors(raw.info, find_layout(raw.info))
+                    psds = _merge_grad_data(psds)
 
                 if args.established_bands:
                     psds = established_bands(psds, freqs)
@@ -230,12 +236,12 @@ def maybe_prep_psds(args):
                     shape = num_res_db.shape
 
                 list_x[split_idx].append(num_res_db)
-                Y[split_idx].append(label)
+                y[split_idx].append(label)
 
             sys.stderr.write("\ntime: {} s\n".format(time.time() - start_t))
 
         assert len(list_x) == 3
-        assert len(Y) == 3
+        assert len(y) == 3
 
         # Make sure we have samples in each of the cross validation sets
         x_lens = [len(_x) for _x in list_x]
@@ -244,25 +250,27 @@ def maybe_prep_psds(args):
             assert x_len > 0, "cross validation set #{} of x is empty. ".format(i)
 
         for i in xrange(3):
-            X[i] = np.dstack(list_x[i])
+            x[i] = np.dstack(list_x[i])
             # We convert the PSD list of ndarrays to a single multidimensional ndarray
-            X[i] = X[i].astype(np.float32)
+            x[i] = x[i].astype(np.float32)
             # We do the same with the labels
-            Y[i] = np.asarray(Y[i], np.float32)
+            y[i] = np.asarray(y[i], np.float32)
             # Transpose for convenience
-            X[i] = X[i].T
+            x[i] = x[i].T
 
-            assert len(X[i].shape) == utils.X_Dims.size.value
-            assert X[i].shape[utils.X_Dims.samples_and_times.value] == Y[i].shape[0], X[i].shape[utils.X_Dims.samples_and_times.value]  # no_samples
-            assert X[i].shape[utils.X_Dims.sensors.value] == 306, X[i].shape[utils.X_Dims.sensors.value]  # sensor no
-            assert np.all(np.isfinite(X[i]))
+            assert len(x[i].shape) == utils.X_Dims.size.value
+            assert x[i].shape[utils.X_Dims.samples_and_times.value] == y[i].shape[0], x[i].shape[utils.X_Dims.samples_and_times.value]  # no_samples
+            assert x[i].shape[utils.X_Dims.sensors.value] == 306, x[i].shape[utils.X_Dims.sensors.value]  # sensor no
+            assert np.all(np.isfinite(x[i]))
 
         # Take any valid file's position information, as all raws [are supposed to] have the same positions.
         # Deep copying it allows the garbage collector to release the raw file. Not major at all.. but still.
         info = copy.deepcopy(next(data_gen(args.data_path))[1].info)
         print("--")
         print("Saving the newly generated dataset")
-        saver_loader.save_ds((X, Y, info))
+        saver_loader.save_ds((x, y, info))
         print("--")
 
-    return X, Y, info
+
+
+    return x, y, info

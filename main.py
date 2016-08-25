@@ -35,9 +35,10 @@ ARGS_ONLY_NAME = "args_only"
 @click.option("--limit",              type=int,     default=None)
 @click.option("--tmin",               type=int,     default=0)
 @click.option("--tmax",               type=int,     default=1000000)
+@click.option("--sensor_type",        type=str,     default="grad")
 @click.option("--noverlap",           type=int,     default=0)
 @click.option("--data_path",          type=str,     default=os.path.join(os.environ["HOME"], "aut_gamma"))
-@click.option("--" + ARGS_ONLY_NAME,  type=bool,  default=False, is_flag=True)
+@click.option("--" + ARGS_ONLY_NAME,  type=bool,    default=False, is_flag=True)
 @click.pass_context
 def main(ctx, **click_options):
     if ctx.invoked_subcommand is None:
@@ -107,7 +108,6 @@ def lc(ctx, job_type):
 @click.option("--learning_rate",        default=0.001,      type=float)
 @click.option("--depth",                default=7,          type=int)
 @click.option("--minibatch_size",       default=256,        type=int)
-@click.option("--sensor_type",          default="both",     type=str)
 @click.option("--filter_scale_factor",  default=2,          type=float)
 @click.option("--dry_run",              default=False,      type=bool, is_flag=True)
 @click.option("--test_qty",             default=2048,       type=int)
@@ -121,7 +121,7 @@ def sc(ctx, net_type, **click_options):
     if ctx.obj["main"][ARGS_ONLY_NAME]:
         return
 
-    click_options["sensor_type"] = True if click_options["sensor_type"] == "both" else click_options["sensor_type"]
+    #click_options["sensor_type"] = True if click_options["sensor_type"] == "both" else click_options["sensor_type"]
     from_main = ctx.obj["main"]
 
     # We put the imports to classification managers inside of the function to not trigger

@@ -9,10 +9,13 @@ import os
 
 # Own
 import NN_utils
+import inspect
 
 # External
 import tensorflow as tf
 import numpy as np
+
+
 
 base_path = os.path.dirname(__file__)
 default_summary_path = os.path.join(base_path, "saves", "tf_summaries")
@@ -169,8 +172,12 @@ class ResNet(NN_utils.AbstractClassifier):
 
         net = self._x
         net = easy_conv(net, 16)
-        NN_utils.residual_block(net, 16, True, non_lin=NN_utils.leaky_relu)
-        # NN_utils.residual_block(net, 32, True, non_lin=lambda a: tf.maximum(0.2 * a, a))
+        net = NN_utils.residual_block(net, 16, True,   non_lin=NN_utils.leaky_relu)
+        net = NN_utils.residual_block(net, 32, False,  non_lin=NN_utils.leaky_relu)
+        net = NN_utils.residual_block(net, 32, False,  non_lin=NN_utils.leaky_relu)
+        net = NN_utils.residual_block(net, 32, True,   non_lin=NN_utils.leaky_relu)
         top = tf.reduce_mean(net, [1, 2])
+
+        print("\n--\n\nModel code:\n{}\n--\n\n".format("\n".join(inspect.getsourcelines(ResNet.__init__))))
 
         self.finish_init(top, y_shape_1, expected_minibatch_size, x_shape, np.float32)

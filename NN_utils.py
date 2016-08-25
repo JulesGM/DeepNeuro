@@ -151,7 +151,7 @@ class AbstractClassifier(object):
             tf.scalar_summary("loss", self._loss)
 
         with tf.name_scope("optimization"):
-            self._opt = tf.train.RMSPropOptimizer(self._lr).minimize(self._loss)
+            self._opt = tf.train.AdamOptimizer(self._lr).minimize(self._loss)
 
         with tf.name_scope("predictions"):
             self._score = tf.nn.softmax(a0)
