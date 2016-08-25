@@ -14,7 +14,7 @@ import inspect
 # External
 import tensorflow as tf
 import numpy as np
-
+import utils
 
 
 base_path = os.path.dirname(__file__)
@@ -27,6 +27,7 @@ class FFNN(NN_utils.AbstractClassifier):
                  summary_writing_path=default_summary_path, activation_factory=NN_utils.relu_layer,):
         assert False, "NEEDS TO BE TESTED AGAIN BEFORE USE"
         super(self.__class__, self).__init__(summary_writing_path)
+        utils.print_func_source(FFNN)
 
         self.dropout_keep_prob = dropout_keep_prob
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape_1], name="x")
@@ -50,6 +51,7 @@ class CNN(NN_utils.AbstractClassifier):
     def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob, filter_scale_factor, expected_minibatch_size,
                  first_layer_scale_factor=2, pool_every_k=3, summary_writing_path=default_summary_path):
         super(self.__class__, self).__init__(summary_writing_path)
+        utils.print_func_source(CNN.__init__)
 
         self.dropout_keep_prob = dropout_keep_prob
         self._x = tf.placeholder(tf.float32, shape=[None, x_shape[1], x_shape[2], x_shape[3]], name="x")
@@ -84,6 +86,8 @@ class VGG(NN_utils.AbstractClassifier):
     def __init__(self, x_shape, y_shape_1, dropout_keep_prob, expected_minibatch_size,
                  summary_writing_path=default_summary_path, ):
         super(self.__class__, self).__init__(summary_writing_path)
+        utils.print_func_source(VGG.__init__)
+
         glob_avg_pool = True
 
         self.dropout_keep_prob = dropout_keep_prob
@@ -114,30 +118,29 @@ class VGG(NN_utils.AbstractClassifier):
                 activation = tf.nn.relu_layer(input_op, kernel, biases, name=scope)
                 return activation
 
-        conv1_1 = conv_adap(self._x, name="conv1_1", kh=3, kw=3, n_out=16, dh=1, dw=1)
-        conv1_2 = conv_adap(conv1_1, name="conv1_2", kh=3, kw=3, n_out=16, dh=1, dw=1)
-        pool1 = mpool_adap(conv1_2, name="pool1", kh=2, kw=2, dw=2, dh=2)
+        net = conv_adap(self._x, name="conv1_1", kh=3, kw=3, n_out=16, dh=1, dw=1)
+        net = conv_adap(net, name="conv1_2", kh=3, kw=3, n_out=16, dh=1, dw=1)
+        net = mpool_adap(net, name="pool1", kh=2, kw=2, dw=2, dh=2)
+
+        # block 2 -- outputs 56x56x128
+        net = tf.nn.dropout(conv_adap(net, name="conv2_1", kh=3, kw=3, n_out=32, dh=1, dw=1), dropout_keep_prob)
+        net = tf.nn.dropout(conv_adap(net, name="conv2_2", kh=3, kw=3, n_out=32, dh=1, dw=1), dropout_keep_prob)
+        net = mpool_adap(net, name="pool2", kh=2, kw=2, dw=2, dh=2)
 
         """
-        # block 2 -- outputs 56x56x128
-        conv2_1 = tf.nn.dropout(conv_adap(pool1, name="conv2_1", kh=3, kw=3, n_out=32, dh=1, dw=1), dropout_keep_prob)
-        conv2_2 = tf.nn.dropout(conv_adap(conv2_1, name="conv2_2", kh=3, kw=3, n_out=32, dh=1, dw=1), dropout_keep_prob)
-        pool2 = mpool_adap(conv2_2, name="pool2", kh=2, kw=2, dw=2, dh=2)
-
-
         # block 3 -- outputs 28x28x256
-        conv3_1 = tf.nn.dropout(conv_adap(pool2, name="conv3_1", kh=3, kw=3, n_out=64, dh=1, dw=1), dropout_keep_prob)
-        conv3_2 = tf.nn.dropout(conv_adap(conv3_1, name="conv3_2", kh=3, kw=3, n_out=64, dh=1, dw=1), dropout_keep_prob)
-        pool3 = mpool_adap(conv3_2, name="pool3", kh=2, kw=2, dh=2, dw=2)
+        net = tf.nn.dropout(conv_adap(net, name="conv3_1", kh=3, kw=3, n_out=64, dh=1, dw=1), dropout_keep_prob)
+        net = tf.nn.dropout(conv_adap(net, name="conv3_2", kh=3, kw=3, n_out=64, dh=1, dw=1), dropout_keep_prob)
+        net = mpool_adap(net, name="pool3", kh=2, kw=2, dh=2, dw=2)
 
         # block 4 -- outputs 14x14x512
-        conv4_1 = tf.nn.dropout(conv_adap(pool3, name="conv4_1", kh=3, kw=3, n_out=128, dh=1, dw=1), dropout_keep_prob)
-        conv4_2 = tf.nn.dropout(conv_adap(conv4_1, name="conv4_2", kh=3, kw=3, n_out=128, dh=1, dw=1), dropout_keep_prob)
-        conv4_3 = tf.nn.dropout(conv_adap(conv4_2, name="conv4_3", kh=3, kw=3, n_out=128, dh=1, dw=1), dropout_keep_prob)
-        pool4 = mpool_adap(conv4_3, name="pool4", kh=2, kw=2, dh=2, dw=2)
+        net = tf.nn.dropout(conv_adap(net, name="conv4_1", kh=3, kw=3, n_out=128, dh=1, dw=1), dropout_keep_prob)
+        net = tf.nn.dropout(conv_adap(net, name="conv4_2", kh=3, kw=3, n_out=128, dh=1, dw=1), dropout_keep_prob)
+        net = tf.nn.dropout(conv_adap(net, name="conv4_3", kh=3, kw=3, n_out=128, dh=1, dw=1), dropout_keep_prob)
+        net = mpool_adap(net, name="pool4", kh=2, kw=2, dh=2, dw=2)
         """
         if glob_avg_pool:
-            top = tf.reduce_mean(pool1, [1, 2])
+            net = tf.reduce_mean(net, [1, 2])
         """
         else:
             shp = pool4.get_shape()
@@ -152,13 +155,14 @@ class VGG(NN_utils.AbstractClassifier):
             fc7 = fc_adap(fc6_drop, name="fc7", n_out=1024) # w should be 1024, 1024
             top = tf.nn.dropout(fc7, dropout_keep_prob, name="fc7_drop")
         """
-        self.finish_init(top, y_shape_1, expected_minibatch_size, x_shape, np.float32)
+        self.finish_init(net, y_shape_1, expected_minibatch_size, x_shape, np.float32)
 
 
 class ResNet(NN_utils.AbstractClassifier):
     def __init__(self, x_shape, y_shape_1, dropout_keep_prob, expected_minibatch_size,
                  summary_writing_path=default_summary_path):
         super(self.__class__, self).__init__(summary_writing_path)
+        utils.print_func_source(ResNet.__init__)
 
         def easy_conv(net, n_out):
             n_in = net.get_shape()[-1].value  # this is the way we should also be doing it
@@ -178,6 +182,6 @@ class ResNet(NN_utils.AbstractClassifier):
         net = NN_utils.residual_block(net, 32, True,   non_lin=NN_utils.leaky_relu)
         top = tf.reduce_mean(net, [1, 2])
 
-        print("\n--\n\nModel code:\n{}\n--\n\n".format("\n".join(inspect.getsourcelines(ResNet.__init__))))
+
 
         self.finish_init(top, y_shape_1, expected_minibatch_size, x_shape, np.float32)

@@ -4,6 +4,8 @@ import numpy as np
 import enum
 import six
 
+import inspect
+
 class X_Dims(enum.Enum):
     # Meh
     samples_and_times = 0
@@ -42,4 +44,22 @@ def print_args(positional, named):
     else:
         print("\t[No named options]")
     print("")
+
+
+def print_func_source(func):
+    if "getsourceline" not in vars(inspect):
+        return
+
+    code = "\n".join(inspect.getsourcelines(func))
+    print(
+"""
+--
+
+Model code:
+
+{}
+
+--
+""".format(code)
+        )
 

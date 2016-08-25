@@ -94,16 +94,50 @@ def data_gen(base_path, limit = None):
         yield name, raw, label, len(full_glob)
 
 
-def established_bands(psds, freqs):
+BANDS = [
+     (0,  4,   'Delta'),
+     (4,  8,   'Theta'),
+     (8,  12,  'Alpha'),
+     (12, 30,  'Beta'),
+     (30, 100, 'Gamma')]
+
+LINEAR_HALF_BANDS = [
+    (0,  2,   'Delta_0'),
+    (2,  4,   'Delta_1'),
+    (4,  6,   'Theta_0'),
+    (6,  8,   'Theta_1'),
+    (8,  10,  'Alpha_0'),
+    (10, 12,  'Alpha_1'),
+    (12, 21,  'Beta_0'),
+    (21, 30,  'Beta_1'),
+    (30, 65,  'Gamma_0'),
+    (65, 100, 'Gamma_1')]
+
+LINEAR_QUARTER_BANDS = [
+    (0,    1,    'Delta_0'),
+    (1,    2,    'Delta_1'),
+    (2,    3,    'Delta_2'),
+    (3,    4,    'Delta_3'),
+    (4,    5,    'Theta_0'),
+    (5,    6,    'Theta_1'),
+    (6,    7,    'Theta_2'),
+    (7,    8,    'Theta_3'),
+    (8,    9,    'Alpha_0'),
+    (9,    10,   'Alpha_1'),
+    (10,   11,   'Alpha_2'),
+    (11,   12,   'Alpha_3'),
+    (12,   16.5, 'Beta_0'),
+    (16.5, 21,   'Beta_1'),
+    (21,   25.5, 'Beta_2'),
+    (25.5, 30,   'Beta_3'),
+    (30,   47.5, 'Gamma_0'),
+    (47.5, 65,   'Gamma_1'),
+    (65,   82.5, 'Gamma_2'),
+    (82.5, 100,  'Gamma_3')]
+
+def established_bands(psds, freqs, bands=BANDS):
     assert np.all(np.mean(psds) < 1E6), "We need the raw psds, not the psds converted to dB."
-    bands = [(0, 4, 'Delta'),
-             (4, 8, 'Theta'),
-             (8, 12, 'Alpha'),
-             (12, 30, 'Beta'),
-             (30, 100, 'Gamma')]
-
     data = np.empty(shape=(psds.shape[0], len(bands)), dtype=np.float32)
-
 
     for i, (fmin, fmax, title) in enumerate(bands):
         freq_mask = (fmin <= freqs) & (freqs < fmax)
@@ -148,7 +182,7 @@ def maybe_prep_psds(args):
 
     # We build savepaths from different values of the parameters
     saver_loader = SaverLoader(os.path.join(psd_saves_path, "{eb}_{fmax}_{limit}_{tincr}_{nfft}_latest_save.pkl" \
-                              .format(eb="eb_" if args.established_bands else "", fmax=args.fmax, limit=args.limit,
+                              .format(eb=args.established_bands, fmax=args.fmax, limit=args.limit,
                                       tincr=args.tincr, nfft=args.nfft)))
 
     if saver_loader.save_exists():
@@ -199,8 +233,6 @@ def maybe_prep_psds(args):
                                         percentage=100 * psd_band_t_start_ms / upper_bound))
                     sys.stderr.flush()
 
-
-
                 psds, freqs = mne.time_frequency.psd_welch(n_jobs=1, # in our tests, more jobs invariably resulted in slower execution, even on the 32 cores xeons of the Helios cluster.
                                      inst=raw,
                                      picks=mne.pick_types(raw.info, meg=True),
@@ -213,11 +245,18 @@ def maybe_prep_psds(args):
                                      )
 
                 if args.sensor_type == "grad":
-                    #picks, pos = _pair_grad_sensors(raw.info, find_layout(raw.info))
                     psds = _merge_grad_data(psds)
 
                 if args.established_bands:
-                    psds = established_bands(psds, freqs)
+                    if args.established_bands == "half":
+                        psds = established_bands(psds, freqs, LINEAR_HALF_BANDS)
+                    elif args.established_bands == "quarter":
+                        psds = established_bands(psds, freqs, LINEAR_QUARTER_BANDS)
+                    elif args.established_bands == True:
+                        psds = established_bands(psds, freqs, BANDS)
+                    else:
+                        raise ValueError("Unsupported value for argument established_bands: {}".format(
+                            args.established_bands))
 
                 num_res_db = 10 * np.log10(psds)
 
@@ -260,7 +299,7 @@ def maybe_prep_psds(args):
 
             assert len(x[i].shape) == utils.X_Dims.size.value
             assert x[i].shape[utils.X_Dims.samples_and_times.value] == y[i].shape[0], x[i].shape[utils.X_Dims.samples_and_times.value]  # no_samples
-            assert x[i].shape[utils.X_Dims.sensors.value] == 306, x[i].shape[utils.X_Dims.sensors.value]  # sensor no
+
             assert np.all(np.isfinite(x[i]))
 
         # Take any valid file's position information, as all raws [are supposed to] have the same positions.

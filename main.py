@@ -28,10 +28,10 @@ base_path = os.path.dirname(__file__)
 ARGS_ONLY_NAME = "args_only"
 
 @click.group(invoke_without_command=True)
-@click.option("--nfft",               type=int,     default=10000)
-@click.option("--fmax",               type=int,     default=100)
+@click.option("--nfft",               type=int,     default=100)
+@click.option("--fmax",               type=int,     default=200)
 @click.option("--tincr",              type=float,   default=1)
-@click.option("--established_bands",  type=bool,    default=True)
+@click.option("--established_bands",                default="quarter")
 @click.option("--limit",              type=int,     default=None)
 @click.option("--tmin",               type=int,     default=0)
 @click.option("--tmax",               type=int,     default=1000000)
@@ -102,7 +102,7 @@ def lc(ctx, job_type):
 
 
 @main.command(help="- Spatial classification")
-@click.argument("net_type",             default="vgg",      type=str)
+@click.argument("net_type",             default="tflearn_resnet",      type=str)
 @click.option("--res",                  default=(224, 224), type=(int, int)) # to match vgg_cifar
 @click.option("--dropout_keep_prob",    default=1,          type=float)
 @click.option("--learning_rate",        default=0.001,      type=float)
@@ -128,7 +128,7 @@ def sc(ctx, net_type, **click_options):
     # the very slow import of tensorflow even when just showing the help text, for example
     import spatial_classification
     spatial_classification.spatial_classification(
-        from_main["X"], from_main["Y"], nfft=from_main["nfft"], tincr=from_main["tincr"], fmax=from_main["fmax"],
+        from_main["X"], from_main["Y"], sensor_type=from_main["sensor_type"], nfft=from_main["nfft"], tincr=from_main["tincr"], fmax=from_main["fmax"],
         info=from_main["info"], established_bands=from_main["established_bands"], net_type=net_type, **click_options)
 
 if __name__ == "__main__": main(obj={})
