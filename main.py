@@ -28,8 +28,8 @@ base_path = os.path.dirname(__file__)
 ARGS_ONLY_NAME = "args_only"
 
 @click.group(invoke_without_command=True)
-@click.option("--nfft",               type=int,     default=100)
-@click.option("--fmax",               type=int,     default=200)
+@click.option("--nfft",               type=int,     default=200)
+@click.option("--fmax",               type=int,     default=100)
 @click.option("--tincr",              type=float,   default=1)
 @click.option("--established_bands",                default="quarter")
 @click.option("--limit",              type=int,     default=None)
