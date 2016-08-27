@@ -115,45 +115,147 @@ def _make_image_save_name(res, sensor_type, nfft, fmax, tincr, use_established_b
     return "_".join([str(x) for x in args])
 
 
-def spatial_classification(x, y, nfft, tincr, fmax, established_bands,  res, sensor_type,  net_type,
-                           learning_rate, minibatch_size, dropout_keep_prob, depth, filter_scale_factor, dry_run,
-                           test_qty, info):
 
+def residual_block(incoming, nb_blocks, out_channels, downsample=False,
+                   downsample_strides=2, activation='relu', batch_norm=True,
+                   bias=True, weights_init='variance_scaling',
+                   bias_init='zeros', regularizer='L2', weight_decay=0.0001,
+                   trainable=True, restore=True, name="ResidualBlock"):
+    """ Residual Block.
+
+    A residual block as described in MSRA's Deep Residual Network paper.
+    Full pre-activation architecture is used here.
+
+    Input:
+        4-D Tensor [batch, height, width, in_channels].
+
+    Output:
+        4-D Tensor [batch, new height, new width, nb_filter].
+
+    Arguments:
+        incoming: `Tensor`. Incoming 4-D Layer.
+        nb_blocks: `int`. Number of layer blocks.
+        out_channels: `int`. The number of convolutional filters of the
+            convolution layers.
+        downsample: `bool`. If True, apply downsampling using
+            'downsample_strides' for strides.
+        downsample_strides: `int`. The strides to use when downsampling.
+        activation: `str` (name) or `function` (returning a `Tensor`).
+            Activation applied to this layer (see tflearn.activations).
+            Default: 'linear'.
+        batch_norm: `bool`. If True, apply batch normalization.
+        bias: `bool`. If True, a bias is used.
+        weights_init: `str` (name) or `Tensor`. Weights initialization.
+            (see tflearn.initializations) Default: 'uniform_scaling'.
+        bias_init: `str` (name) or `tf.Tensor`. Bias initialization.
+            (see tflearn.initializations) Default: 'zeros'.
+        regularizer: `str` (name) or `Tensor`. Add a regularizer to this
+            layer weights (see tflearn.regularizers). Default: None.
+        weight_decay: `float`. Regularizer decay parameter. Default: 0.001.
+        trainable: `bool`. If True, weights will be trainable.
+        restore: `bool`. If True, this layer weights will be restored when
+            loading a model
+        name: A name for this layer (optional). Default: 'ShallowBottleneck'.
+
+    References:
+        - Deep Residual Learning for Image Recognition. Kaiming He, Xiangyu
+            Zhang, Shaoqing Ren, Jian Sun. 2015.
+        - Identity Mappings in Deep Residual Networks. Kaiming He, Xiangyu
+            Zhang, Shaoqing Ren, Jian Sun. 2015.
+
+    Links:
+        - [http://arxiv.org/pdf/1512.03385v1.pdf]
+            (http://arxiv.org/pdf/1512.03385v1.pdf)
+        - [Identity Mappings in Deep Residual Networks]
+            (https://arxiv.org/pdf/1603.05027v2.pdf)
+
+    """
+    resnet = incoming
+    in_channels = incoming.get_shape().as_list()[-1]
+
+    with tf.name_scope(name):
+        for i in range(nb_blocks):
+
+            identity = resnet
+
+            if not downsample:
+                downsample_strides = 1
+
+            if batch_norm:
+                resnet = tflearn.batch_normalization(resnet)
+            resnet = tflearn.activation(resnet, activation)
+
+            resnet = tflearn.conv_2d(resnet, out_channels, 3,
+                             downsample_strides, 'same', 'linear',
+                             bias, weights_init, bias_init,
+                             regularizer, weight_decay, trainable,
+                             restore)
+
+            if batch_norm:
+                resnet = tflearn.batch_normalization(resnet)
+            resnet = tflearn.activation(resnet, activation)
+
+            resnet = tflearn.conv_2d(resnet, out_channels, 3, 1, 'same',
+                             'linear', bias, weights_init,
+                             bias_init, regularizer, weight_decay,
+                             trainable, restore)
+
+            # Downsampling
+            if downsample_strides > 1:
+                identity = tflearn.avg_pool_2d(identity, 1,
+                                               downsample_strides)
+
+            # Projection to new dimension
+            if in_channels != out_channels:
+                ch = (out_channels - in_channels)//2
+                identity = tf.pad(identity,
+                                  [[0, 0], [0, 0], [0, 0], [ch, ch]])
+                in_channels = out_channels
+
+            resnet = resnet + identity
+
+    return resnet
+
+
+def spatial_classification(args):
     saves_loc = os.path.join(base_path, "saves/interp_image_saves")
     if not os.path.exists(saves_loc):
         os.mkdir(saves_loc)
 
-    image_name = _make_image_save_name(res, sensor_type, nfft, tincr, fmax, established_bands)
+    image_name = _make_image_save_name(args.res, args.sensor_type, args.nfft, args.tincr, args.fmax, args.established_bands)
     image_save_name = image_name + ".pkl"
     saver_loader = utils.data_utils.SaverLoader(os.path.join(saves_loc, image_save_name))
 
     if saver_loader.save_exists():
+        print("--")
+        print("Unpickling {}.".format(saver_loader._save_path))
         prepared_x = saver_loader.load_ds()
+        print("Done unpickling.")
+        print("--")
     else:
         start = time.time()
-        prepared_x = make_interpolated_data(x, res, "cubic", info, sensor_type)
+        prepared_x = make_interpolated_data(args.x, args.res, "cubic", args.info, args.sensor_type)
         sys.stderr.write("\n\n")
         print("\nPreparation of the images took {} seconds".format(time.time() - start))
         print("Shape of the prepared dataset {}".format(" & ".join([str(prep_x.shape) for prep_x in prepared_x[:2]])))
         saver_loader.save_ds(prepared_x)
 
     for i in xrange(2):
-        y[i] = utils.to_one_hot(y[i], np.max(y[i]) + 1)
+        args.y[i] = utils.to_one_hot(args.y[i], np.max(args.y[i]) + 1)
 
     training_prepared_x = prepared_x[0]
-    training_y = y[0]
+    training_y = args.y[0]
 
     validation_prepared_x = prepared_x[1]
-    validation_y = y[1]
+    validation_y = args.y[1]
 
     x_shape = training_prepared_x.shape
     y_shape_1 = training_y.shape[1]
 
-    if net_type == "tflearn_resnet":
-        utils.print_func_source(spatial_classification)
-
+    if args.net_type == "tflearn_resnet":
         # https://github.com/tflearn/tflearn/blob/master/examples/images/residual_network_cifar10.py
-        n = 5
+
+        n = 4
         assert(len(x_shape) == 4)
         assert(all([len(prepared_x[i].shape) == 4 for i in range(2)]))
 
@@ -162,115 +264,114 @@ def spatial_classification(x, y, nfft, tincr, fmax, established_bands,  res, sen
         shape_width_test = len(net.get_shape().as_list())
         assert shape_width_test == 4, "expected 4, got {}".format(shape_width_test)
 
-        net = tflearn.conv_2d(net, 16, 3, weight_decay=0.0001,)
-        net = tflearn.batch_normalization(net)
-        net = tflearn.dropout(net, dropout_keep_prob)
-        net = tflearn.residual_block(net, n, 16,)
-        net = tflearn.batch_normalization(net)
-        net = tflearn.dropout(net, dropout_keep_prob)
+        net = tflearn.conv_2d(net, 32, 3, weight_decay=0.0001, )
+        net = tflearn.residual_block(net, n, 32, )
+
         net = tflearn.residual_block(net, 1, 32, downsample=True,)
+        net = tflearn.residual_block(net, n - 1, 32, )
+
+        net = tflearn.residual_block(net, 1, 48, downsample=True,)
+        net = tflearn.residual_block(net, n - 1, 48, )
+
         net = tflearn.batch_normalization(net)
-        net = tflearn.dropout(net, dropout_keep_prob)
-        net = tflearn.residual_block(net, n - 1, 32,)
-        net = tflearn.batch_normalization(net)
-        net = tflearn.dropout(net, dropout_keep_prob)
-        net = tflearn.residual_block(net, 1, 64, downsample=True,)
-        net = tflearn.batch_normalization(net)
-        net = tflearn.dropout(net, dropout_keep_prob)
-        net = tflearn.residual_block(net, n - 1, 64,)
-        net = tflearn.batch_normalization(net)
-        net = tflearn.dropout(net, dropout_keep_prob)
         net = tflearn.activation(net, 'relu')
+
         net = tflearn.global_avg_pool(net)
 
         # Regression
         net = tflearn.fully_connected(net, 2, activation='softmax')
-        mom = tflearn.Momentum(0.1, lr_decay=0.1, decay_step=32000, staircase=True)
-        net = tflearn.regression(net, optimizer=mom, loss='categorical_crossentropy')
+        #mom = tflearn.Momentum(0.1, lr_decay=0.1, decay_step=32000, staircase=True)
+        net = tflearn.regression(net, optimizer='adam', loss='categorical_crossentropy')
 
         # Training
-        model = tflearn.DNN(net, checkpoint_path='model_resnet_cifar10',
-                            max_checkpoints=10, tensorboard_verbose=0,
-                            clip_gradients=0.)
+        model = tflearn.DNN(net, max_checkpoints=10, tensorboard_verbose=0, clip_gradients=0,
+                            checkpoint_path=(args.model_save_path if args.model_save_path else 'model_tflearn_resnet')
+                            )
+
+        if args.load_model:
+            model.load(args.load_model)
 
         model.fit(training_prepared_x, training_y, n_epoch=10000000, validation_set=(validation_prepared_x, validation_y),
                   snapshot_epoch=False, snapshot_step=500,
                   show_metric=True, batch_size=32, shuffle=True,
                   run_id='resnet_coco')
 
-    elif net_type == "tflearn_lstm":
-        utils.print_func_source(spatial_classification)
-
+    elif args.net_type == "tflearn_lstm": # should really be tflearn_lstm_resnet, but is too long for the moment
+        assert False, "this is garbage code, should be ignored"
         n = 5
+        l = 20
+        skip_length = 1
+
         net = tflearn.input_data(shape=x_shape[1:])
 
         net = tflearn.conv_2d(net, 16, 3, regularizer='L2', weight_decay=0.0001)
-        net = tflearn.batch_normalization(net)
-        net = tflearn.dropout(net, dropout_keep_prob)
         net = tflearn.residual_block(net, n, 16)
-        net = tflearn.dropout(net, dropout_keep_prob)
-        """
-        net = tflearn.residual_block(net, 1, 32, downsample=True)
-        net = tflearn.residual_block(net, n - 1, 32)
-        net = tflearn.residual_block(net, 1, 64, downsample=True)
-        net = tflearn.residual_block(net, n - 1, 64)
-        """
-        net = tflearn.batch_normalization(net)
+        net = tflearn.dropout(net, args.dropout_keep_prob)
         net = tflearn.activation(net, 'relu')
         net = tflearn.global_avg_pool(net)
-        net = tflearn.lstm(net, 128, return_seq=True)
-        net = tflearn.batch_normalization(net)
-        net = tflearn.lstm(net, 128)
-        net = tflearn.batch_normalization(net)
 
-        net = tflearn.fully_connected(net, 2, activation='softmax')
-        net = tflearn.regression(net, optimizer='adam', loss='categorical_crossentropy', name="output1")
-        model = tflearn.DNN(net, tensorboard_verbose=2)
+        lstm = tf.nn.rnn_cell.BasicLSTMCell(net.get_shape()[-1].value)
+        state = np.zeros([1, lstm.state_size])
+        out_shape = [None, 2]
+        out = tf.Variable(initial_value=tf.zeros_initializer(shape=out_shape), dtype=tf.float32, trainable=False)
+        import NN_utils
+        for i in range(0, net.get_shape()[0].value, skip_length):
+            net, state = lstm(net, state)
+            # net = tflearn.batch_normalization(net)
+            out[i] = NN_utils.softmax_layer(net, [net.get_shape()[1].value, 2])
+
+        net = tflearn.regression(out, optimizer='adam', loss='categorical_crossentropy', name="output1")
+        model = tflearn.DNN(net, tensorboard_verbose=2, checkpoint_path=(
+                                                args.model_save_path if args.model_save_path else 'model_tflearn_lstm'))
+
+        if args.load_model:
+            model.load(args.load_model)
+
         model.fit(training_prepared_x, training_y, n_epoch=1000000000,
                   validation_set=(validation_prepared_x, validation_y),
-                  show_metric=True, snapshot_step=100)
+                  show_metric=True, snapshot_step=100, run_id="lstm_resnet_coco")
 
-
-    elif net_type == "vgg":
-
+    elif args.net_type == "vgg":
         print("vgg - not really vgg")
         print("x_shape: {}".format(x_shape))
         summary_path = os.path.join(base_path, "saves", "tf_summaries", "vgg_" + image_save_name + "_" +
                                     str(random.randint(0, 1000000000000)))
-        model = NN_models.VGG(x_shape, y_shape_1, dropout_keep_prob=dropout_keep_prob,
-                              summary_writing_path=summary_path, expected_minibatch_size=minibatch_size)
-        if not dry_run:
+        model = NN_models.VGG(x_shape, y_shape_1, dropout_keep_prob=args.dropout_keep_prob,
+                              summary_writing_path=summary_path, expected_minibatch_size=args.minibatch_size)
+        if not args.dry_run:
             model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y,
-                      n_epochs=10000000, minibatch_size=minibatch_size, learning_rate=learning_rate, test_qty=test_qty)
+                      n_epochs=10000000, minibatch_size=args.minibatch_size, learning_rate=args.learning_rate,
+                      test_qty=args.test_qty)
         else:
             print(">>>>> NO FITTING, WAS A DRY RUN")
-    elif net_type == "cnn":
+
+    elif args.net_type == "cnn":
         print("cnn")
 
         summary_path = os.path.join(base_path, "saves", "tf_summaries", "cnn_" + image_name + "_" +
                                     str(random.randint(0, 1000000000000)))
-        model = NN_models.CNN(x_shape, y_shape_1, depth=depth, dropout_keep_prob=dropout_keep_prob,
-                              filter_scale_factor=filter_scale_factor, summary_writing_path=summary_path,
-                              expected_minibatch_size=minibatch_size)
-        if not dry_run:
+        model = NN_models.CNN(x_shape, y_shape_1, depth=args.depth, dropout_keep_prob=args.dropout_keep_prob,
+                              filter_scale_factor=args.filter_scale_factor, summary_writing_path=summary_path,
+                              expected_minibatch_size=args.minibatch_size)
+        if not args.dry_run:
 
             model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y, n_epochs=10000000,
-                      minibatch_size=minibatch_size, learning_rate=learning_rate, test_qty=test_qty)
+                      minibatch_size=args.minibatch_size, learning_rate=args.learning_rate, test_qty=args.test_qty)
         else:
             print(">>>>> NO FITTING, WAS A DRY RUN")
-    elif net_type == "resnet":
+    elif args.net_type == "resnet":
         print("resnet")
         summary_path = os.path.join(base_path, "saves", "tf_summaries", "resnet_" + image_save_name + "_" +
                                     str(random.randint(0, 1000000000000)))
-        model = NN_models.ResNet(x_shape, y_shape_1, dropout_keep_prob=dropout_keep_prob,
+        model = NN_models.ResNet(x_shape, y_shape_1, dropout_keep_prob=args.dropout_keep_prob,
                                  summary_writing_path=summary_path,
-                                 expected_minibatch_size=minibatch_size)
-        if not dry_run:
+                                 expected_minibatch_size=args.minibatch_size)
+        if not args.dry_run:
             model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y,
-                      n_epochs=10000000, minibatch_size=minibatch_size, learning_rate=learning_rate, test_qty=test_qty)
+                      n_epochs=10000000, minibatch_size=args.minibatch_size, learning_rate=args.learning_rate, test_qty=args.test_qty)
         else:
             print(">>>>> NO FITTING, WAS A DRY RUN")
 
 
     else:
-        raise RuntimeError("Received unexpected value '{}' for option --net_type".format(net_type))
+        raise RuntimeError("Received unexpected value '{}' for option --net_type".format(args.net_type))

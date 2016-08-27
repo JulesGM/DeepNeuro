@@ -8,6 +8,7 @@ from six.moves import zip as izip
 # stdlib imports
 import os
 import logging
+from argparse import Namespace
 
 # local imports
 import utils
@@ -17,6 +18,7 @@ import utils.data_utils
 # external imports
 import numpy as np
 import click
+
 
 """
 MNE's logger prints massive amount of useless stuff, and neither mne.set_logging_level(logging.ERROR) or
@@ -28,10 +30,10 @@ base_path = os.path.dirname(__file__)
 ARGS_ONLY_NAME = "args_only"
 
 @click.group(invoke_without_command=True)
-@click.option("--nfft",               type=int,     default=200)
+@click.option("--nfft",               type=int,     default=1000)# 1000 for Quarter established_bands
 @click.option("--fmax",               type=int,     default=100)
 @click.option("--tincr",              type=float,   default=1)
-@click.option("--established_bands",                default="quarter")
+@click.option("--established_bands",                default="quarter") # True, False, Quarter, Half
 @click.option("--limit",              type=int,     default=None)
 @click.option("--tmin",               type=int,     default=0)
 @click.option("--tmax",               type=int,     default=1000000)
@@ -65,22 +67,18 @@ def main(ctx, **click_options):
         raise RuntimeError("Couldn't find fif_split.json. Should be generated with ./generate_split.py at the beginning"
                            " of the data exploration, and then shared.")
 
-    # This part would be much cleaner without passing the `args` object to `maybe_prep_psds`.
-    # We haven't found the time to do this conversion yet.
-    from argparse import Namespace
-    args = Namespace(**click_options)
-    X, Y, sample_info = utils.data_utils.maybe_prep_psds(args)
+    x, y, sample_info = utils.data_utils.maybe_prep_psds(Namespace(**click_options))
 
-    ctx.obj["main"]["X"] = X
-    ctx.obj["main"]["Y"] = Y
+    ctx.obj["main"]["x"] = x
+    ctx.obj["main"]["y"] = y
     ctx.obj["main"]["info"] = sample_info
 
     print("Dataset properties:")
     for i in xrange(3):
-        print("\t- {} nan/inf:    {}".format(i, np.any(np.isnan(X[i]))))
-        print("\t- {} shape:      {}".format(i, X[i].shape))
-        print("\t- {} mean:       {}".format(i, np.mean(X[i])))
-        print("\t- {} stddev:     {}".format(i, np.std(X[i])))
+        print("\t- {} nan/inf:    {}".format(i, np.any(np.isnan(x[i]))))
+        print("\t- {} shape:      {}".format(i, x[i].shape))
+        print("\t- {} mean:       {}".format(i, np.mean(x[i])))
+        print("\t- {} stddev:     {}".format(i, np.std(x[i])))
         print("\t--")
     print("--")
 
@@ -98,7 +96,7 @@ def lc(ctx, job_type):
     # We put the imports to classification managers inside of the function to not trigger
     # the very slow import of tensorflow even when just showing the help text, for example
     import linear_classification
-    linear_classification.linear_classification(ctx.obj["main"]["X"], ctx.obj["main"]["Y"], job_type)
+    linear_classification.linear_classification(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
 
 
 @main.command(help="- Spatial classification")
@@ -111,6 +109,8 @@ def lc(ctx, job_type):
 @click.option("--filter_scale_factor",  default=2,          type=float)
 @click.option("--dry_run",              default=False,      type=bool, is_flag=True)
 @click.option("--test_qty",             default=2048,       type=int)
+@click.option("--load_model",           default=None,)
+@click.option("--model_save_path",      default=None,)
 @click.pass_context
 def sc(ctx, net_type, **click_options):
     # As it it quite common to leave quite a few options at their default values,
@@ -121,14 +121,17 @@ def sc(ctx, net_type, **click_options):
     if ctx.obj["main"][ARGS_ONLY_NAME]:
         return
 
-    #click_options["sensor_type"] = True if click_options["sensor_type"] == "both" else click_options["sensor_type"]
-    from_main = ctx.obj["main"]
+    click_options.update(click_positional)
+
+    # This breaks encapsulation. However, it makes adding new arguments much easier, which is the more important
+    # part in an early research project
+    click_options.update(ctx.obj["main"])
+    click_options.update(click_positional)
 
     # We put the imports to classification managers inside of the function to not trigger
     # the very slow import of tensorflow even when just showing the help text, for example
     import spatial_classification
-    spatial_classification.spatial_classification(
-        from_main["X"], from_main["Y"], sensor_type=from_main["sensor_type"], nfft=from_main["nfft"], tincr=from_main["tincr"], fmax=from_main["fmax"],
-        info=from_main["info"], established_bands=from_main["established_bands"], net_type=net_type, **click_options)
+
+    spatial_classification.spatial_classification(Namespace(**click_options))
 
 if __name__ == "__main__": main(obj={})

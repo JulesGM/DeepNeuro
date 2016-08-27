@@ -47,19 +47,4 @@ def print_args(positional, named):
 
 
 def print_func_source(func):
-    if "getsourceline" not in vars(inspect):
-        return
-
-    code = "\n".join(inspect.getsourcelines(func))
-    print(
-"""
---
-
-Model code:
-
-{}
-
---
-""".format(code)
-        )
-
+    pass

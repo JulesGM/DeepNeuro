@@ -29,12 +29,12 @@ class SaverLoader(object):
         self._save_path = path
 
     def save_ds(self, data):
-        import joblib
-        joblib.dump(data, self._save_path)
+        import joblib, pickle
+        joblib.dump(data, self._save_path, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load_ds(self):
         import joblib
-        return joblib.load(self._save_path)
+        return joblib.load(self._save_path,)
 
     def save_exists(self):
         return os.path.exists(self._save_path)
