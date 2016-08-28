@@ -4,8 +4,6 @@ import numpy as np
 import enum
 import six
 
-import inspect
-
 class X_Dims(enum.Enum):
     # Meh
     samples_and_times = 0

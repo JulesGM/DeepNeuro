@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.ERROR) seem to be working.
 """
 logger = logging.getLogger('mne')
 logger.disabled = True
-base_path = os.path.dirname(__file__)
+base_path = os.path.dirname(os.path.realpath(__file__))
 ARGS_ONLY_NAME = "args_only"
 
 @click.group(invoke_without_command=True)

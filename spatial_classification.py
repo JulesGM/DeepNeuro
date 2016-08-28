@@ -25,7 +25,8 @@ import mne
 import joblib
 from mne.channels.layout import pick_types, _auto_topomap_coords
 
-base_path = os.path.dirname(__file__)
+import h5py
+base_path = os.path.dirname(os.path.realpath(__file__))
 
 
 def _aux_interp(sample_idx, x, sample_set_idx, sample_bound, fft_bound, sensor_positions, grid, method, picks, show, interp_x):
@@ -39,7 +40,7 @@ def _aux_interp(sample_idx, x, sample_set_idx, sample_bound, fft_bound, sensor_p
         interp_x[sample_set_idx][sample_idx, fft_channel_idx] = psd_image
 
 
-def make_interpolated_data(x, res, method, info, sensor_type, show=False):
+def make_interpolated_data(x, res, method, info, sensor_type, show, hdf5_saver_loader):
     # Take any valid file's position information, as all raws [are supposed to] have the same positions
 
     if sensor_type == "grad":
@@ -64,20 +65,22 @@ def make_interpolated_data(x, res, method, info, sensor_type, show=False):
     grid_x, grid_y = np.meshgrid(np.linspace(min_x, max_x, res[0],), np.linspace(min_y, max_y, res[1]))
     grid = (grid_x, grid_y)
 
-    interp_x = [None, None, None]
+    h5_f = h5py.File(hdf5_saver_loader._save_path, "w", libver="latest")
 
+    interp_x = [None, None,]
     acceptable = {"grad", "mag"}
 
     assert sensor_type in acceptable, "sensor_type must be grad or mag, True (both) is not currently supported. " \
                                       "Got {}.".format(sensor_type)
-    parr = False
+
+    parr = True # This is only put to False for debugging purposes
 
     with joblib.Parallel(n_jobs=32,
                          backend="threading") as pool:
         for cv_set in range(2):
-            interp_x[cv_set] = np.empty([x[cv_set].shape[utils.X_Dims.samples_and_times.value],
-                                         x[cv_set].shape[utils.X_Dims.fft_ch.value], res[0], res[1]],
-                                         dtype=np.float32)
+
+            shape = [x[cv_set].shape[utils.X_Dims.samples_and_times.value], x[cv_set].shape[utils.X_Dims.fft_ch.value], res[0], res[1]]
+            interp_x[cv_set] = h5_f.create_dataset(str(cv_set), shape, np.float32)
 
             sample_bound = x[cv_set].shape[utils.X_Dims.samples_and_times.value]
             fft_bound = x[cv_set].shape[utils.X_Dims.fft_ch.value]
@@ -115,130 +118,31 @@ def _make_image_save_name(res, sensor_type, nfft, fmax, tincr, use_established_b
     return "_".join([str(x) for x in args])
 
 
-
-def residual_block(incoming, nb_blocks, out_channels, downsample=False,
-                   downsample_strides=2, activation='relu', batch_norm=True,
-                   bias=True, weights_init='variance_scaling',
-                   bias_init='zeros', regularizer='L2', weight_decay=0.0001,
-                   trainable=True, restore=True, name="ResidualBlock"):
-    """ Residual Block.
-
-    A residual block as described in MSRA's Deep Residual Network paper.
-    Full pre-activation architecture is used here.
-
-    Input:
-        4-D Tensor [batch, height, width, in_channels].
-
-    Output:
-        4-D Tensor [batch, new height, new width, nb_filter].
-
-    Arguments:
-        incoming: `Tensor`. Incoming 4-D Layer.
-        nb_blocks: `int`. Number of layer blocks.
-        out_channels: `int`. The number of convolutional filters of the
-            convolution layers.
-        downsample: `bool`. If True, apply downsampling using
-            'downsample_strides' for strides.
-        downsample_strides: `int`. The strides to use when downsampling.
-        activation: `str` (name) or `function` (returning a `Tensor`).
-            Activation applied to this layer (see tflearn.activations).
-            Default: 'linear'.
-        batch_norm: `bool`. If True, apply batch normalization.
-        bias: `bool`. If True, a bias is used.
-        weights_init: `str` (name) or `Tensor`. Weights initialization.
-            (see tflearn.initializations) Default: 'uniform_scaling'.
-        bias_init: `str` (name) or `tf.Tensor`. Bias initialization.
-            (see tflearn.initializations) Default: 'zeros'.
-        regularizer: `str` (name) or `Tensor`. Add a regularizer to this
-            layer weights (see tflearn.regularizers). Default: None.
-        weight_decay: `float`. Regularizer decay parameter. Default: 0.001.
-        trainable: `bool`. If True, weights will be trainable.
-        restore: `bool`. If True, this layer weights will be restored when
-            loading a model
-        name: A name for this layer (optional). Default: 'ShallowBottleneck'.
-
-    References:
-        - Deep Residual Learning for Image Recognition. Kaiming He, Xiangyu
-            Zhang, Shaoqing Ren, Jian Sun. 2015.
-        - Identity Mappings in Deep Residual Networks. Kaiming He, Xiangyu
-            Zhang, Shaoqing Ren, Jian Sun. 2015.
-
-    Links:
-        - [http://arxiv.org/pdf/1512.03385v1.pdf]
-            (http://arxiv.org/pdf/1512.03385v1.pdf)
-        - [Identity Mappings in Deep Residual Networks]
-            (https://arxiv.org/pdf/1603.05027v2.pdf)
-
-    """
-    resnet = incoming
-    in_channels = incoming.get_shape().as_list()[-1]
-
-    with tf.name_scope(name):
-        for i in range(nb_blocks):
-
-            identity = resnet
-
-            if not downsample:
-                downsample_strides = 1
-
-            if batch_norm:
-                resnet = tflearn.batch_normalization(resnet)
-            resnet = tflearn.activation(resnet, activation)
-
-            resnet = tflearn.conv_2d(resnet, out_channels, 3,
-                             downsample_strides, 'same', 'linear',
-                             bias, weights_init, bias_init,
-                             regularizer, weight_decay, trainable,
-                             restore)
-
-            if batch_norm:
-                resnet = tflearn.batch_normalization(resnet)
-            resnet = tflearn.activation(resnet, activation)
-
-            resnet = tflearn.conv_2d(resnet, out_channels, 3, 1, 'same',
-                             'linear', bias, weights_init,
-                             bias_init, regularizer, weight_decay,
-                             trainable, restore)
-
-            # Downsampling
-            if downsample_strides > 1:
-                identity = tflearn.avg_pool_2d(identity, 1,
-                                               downsample_strides)
-
-            # Projection to new dimension
-            if in_channels != out_channels:
-                ch = (out_channels - in_channels)//2
-                identity = tf.pad(identity,
-                                  [[0, 0], [0, 0], [0, 0], [ch, ch]])
-                in_channels = out_channels
-
-            resnet = resnet + identity
-
-    return resnet
-
-
 def spatial_classification(args):
     saves_loc = os.path.join(base_path, "saves/interp_image_saves")
     if not os.path.exists(saves_loc):
         os.mkdir(saves_loc)
 
     image_name = _make_image_save_name(args.res, args.sensor_type, args.nfft, args.tincr, args.fmax, args.established_bands)
-    image_save_name = image_name + ".pkl"
-    saver_loader = utils.data_utils.SaverLoader(os.path.join(saves_loc, image_save_name))
+    image_save_name = image_name + ".h5"
+    hdf5_saver_loader = utils.data_utils.HDF5SaverLoader(os.path.join(saves_loc, image_save_name))
 
-    if saver_loader.save_exists():
+    if hdf5_saver_loader.save_exists():
         print("--")
-        print("Unpickling {}.".format(saver_loader._save_path))
-        prepared_x = saver_loader.load_ds()
+        print("Unpickling {}.".format(hdf5_saver_loader._save_path))
+        prepared_x = hdf5_saver_loader.load_ds()
         print("Done unpickling.")
         print("--")
     else:
         start = time.time()
-        prepared_x = make_interpolated_data(args.x, args.res, "cubic", args.info, args.sensor_type)
+        prepared_x = make_interpolated_data(args.x, args.res, "cubic", args.info, args.sensor_type, False, hdf5_saver_loader)
         sys.stderr.write("\n\n")
         print("\nPreparation of the images took {} seconds".format(time.time() - start))
         print("Shape of the prepared dataset {}".format(" & ".join([str(prep_x.shape) for prep_x in prepared_x[:2]])))
-        saver_loader.save_ds(prepared_x)
+
+        # We want to use the mem mapped hdf5 instead of keeping our tens of gigs of images in ram,
+        # save_ds also loads the hdf5 file it saved to.
+        # Ideally, we would write the images to the files as they get computed. This is a TODO.
 
     for i in xrange(2):
         args.y[i] = utils.to_one_hot(args.y[i], np.max(args.y[i]) + 1)
@@ -280,8 +184,8 @@ def spatial_classification(args):
 
         # Regression
         net = tflearn.fully_connected(net, 2, activation='softmax')
-        #mom = tflearn.Momentum(0.1, lr_decay=0.1, decay_step=32000, staircase=True)
-        net = tflearn.regression(net, optimizer='adam', loss='categorical_crossentropy')
+        mom = tflearn.Momentum(0.1, lr_decay=0.1, decay_step=32000, staircase=True)
+        net = tflearn.regression(net, optimizer=mom, loss='categorical_crossentropy')
 
         # Training
         model = tflearn.DNN(net, max_checkpoints=10, tensorboard_verbose=0, clip_gradients=0,
@@ -295,6 +199,53 @@ def spatial_classification(args):
                   snapshot_epoch=False, snapshot_step=500,
                   show_metric=True, batch_size=32, shuffle=True,
                   run_id='resnet_coco')
+
+    elif args.net_type == "tflearn_vgg":
+        # Building 'VGG Network'
+        net = tflearn.input_data(x_shape[1:])                   # 224x224x20
+
+        net = tflearn.conv_2d(net, 64, 3, activation='relu')
+        net = tflearn.max_pool_2d(net, 2, strides=2)            # 112x112x64
+        assert np.all(net.get_shape().as_list()[1:] == [112, 112, 64])
+
+        net = tflearn.conv_2d(net, 128, 3, activation='relu')
+        net = tflearn.max_pool_2d(net, 2, strides=2)            # 57x57x128
+        assert np.all(net.get_shape().as_list()[1:] == [57, 57, 128])
+
+        net = tflearn.conv_2d(net, 256, 3, activation='relu')
+        net = tflearn.conv_2d(net, 256, 3, activation='relu')
+        net = tflearn.max_pool_2d(net, 2, strides=2)            #
+        assert np.all(net.get_shape().as_list()[1:] == [57, 57, 256])
+
+        net = tflearn.conv_2d(net, 512, 3, activation='relu')
+        net = tflearn.conv_2d(net, 512, 3, activation='relu')
+        net = tflearn.max_pool_2d(net, 2, strides=2)
+
+        net = tflearn.conv_2d(net, 512, 3, activation='relu')
+        net = tflearn.conv_2d(net, 512, 3, activation='relu')
+        net = tflearn.max_pool_2d(net, 2, strides=2)
+
+        net = tflearn.fully_connected(net, 4096, activation='relu')
+        net = tflearn.dropout(net, 0.5)
+        net = tflearn.fully_connected(net, 4096, activation='relu')
+        net = tflearn.dropout(net, 0.5)
+        net = tflearn.fully_connected(net, 17, activation='softmax')
+
+        net = tflearn.regression(net, optimizer='rmsprop',
+                             loss='categorical_crossentropy',
+                             learning_rate=0.001)
+
+        # Training
+        model = tflearn.DNN(net, checkpoint_path='model_vgg',
+                            max_checkpoints=1, tensorboard_verbose=0)
+
+        if args.load_model:
+            model.load(args.load_model)
+
+        model.fit(training_prepared_x, training_y, n_epoch=500, shuffle=True,
+                  validation_set=(validation_prepared_x, validation_y),
+                  show_metric=True, batch_size=32, snapshot_step=500,)
+
 
     elif args.net_type == "tflearn_lstm": # should really be tflearn_lstm_resnet, but is too long for the moment
         assert False, "this is garbage code, should be ignored"

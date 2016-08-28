@@ -1,6 +1,8 @@
 from __future__ import print_function, generators, division, with_statement
 from six import iteritems
 from six.moves import zip as izip, range as xrange
+from six.moves import cPickle as pickle
+
 
 # Stdlib
 import os
@@ -17,24 +19,53 @@ import utils
 
 # External
 import numpy as np
+import joblib
+import h5py
 import mne
 import mne.io.pick
-from mne.channels.layout import find_layout, _merge_grad_data, _pair_grad_sensors
-mne.set_log_level("ERROR")
-base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)))
 
+from mne.channels.layout import _merge_grad_data
+mne.set_log_level("ERROR")
+
+base_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 class SaverLoader(object):
     def __init__(self, path):
         self._save_path = path
 
     def save_ds(self, data):
-        import joblib, pickle
         joblib.dump(data, self._save_path, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load_ds(self):
-        import joblib
         return joblib.load(self._save_path,)
+
+    def save_exists(self):
+        return os.path.exists(self._save_path)
+
+
+class HDF5SaverLoader(object):
+    def __init__(self, path):
+        self._save_path = path
+
+    def load_ds(self):
+        """
+        The data is saved under names for each of the cross validation sets.
+        """
+        f = h5py.File(self._save_path, "r")
+        new_x = [None for _ in f]
+        for k, dataset in f.values():
+            new_x[int(k)] = dataset
+
+        return new_x
+
+    def save_ds(self, data, names):
+        f = h5py.File(self._save_path, mode="w", libver="latest")
+        new_x = []
+
+        for i, cv_set in enumerate(data):
+            new_x.append(f.create_dataset(str(i), data=data))
+
+        return new_x
 
     def save_exists(self):
         return os.path.exists(self._save_path)
@@ -161,7 +192,6 @@ def maybe_prep_psds(args):
     x = [None, None, None] # Generated PSDs
     y = [[], [], []] # Generated labels
 
-    base_path = os.path.dirname(os.path.dirname(__file__))
     json_path = os.path.join(base_path, "fif_split.json")
 
     with open(json_path, "r") as json_f:
