@@ -45,21 +45,21 @@ class SaverLoader(object):
 
 class HDF5SaverLoader(object):
     def __init__(self, path):
-        self._save_path = path
+        self.save_path = path
 
     def load_ds(self):
         """
         The data is saved under names for each of the cross validation sets.
         """
-        f = h5py.File(self._save_path, "r")
+        f = h5py.File(self.save_path, "r")
         new_x = [None for _ in f]
-        for k, dataset in f.values():
+        for k, dataset in f.items():
             new_x[int(k)] = dataset
 
         return new_x
 
     def save_ds(self, data, names):
-        f = h5py.File(self._save_path, mode="w", libver="latest")
+        f = h5py.File(self.save_path, mode="w", libver="latest")
         new_x = []
 
         for i, cv_set in enumerate(data):
@@ -68,7 +68,7 @@ class HDF5SaverLoader(object):
         return new_x
 
     def save_exists(self):
-        return os.path.exists(self._save_path)
+        return os.path.exists(self.save_path)
 
 
 def data_gen(base_path, limit = None):
@@ -265,7 +265,7 @@ def maybe_prep_psds(args):
 
                 psds, freqs = mne.time_frequency.psd_welch(n_jobs=1, # in our tests, more jobs invariably resulted in slower execution, even on the 32 cores xeons of the Helios cluster.
                                      inst=raw,
-                                     picks=mne.pick_types(raw.info, meg=True),
+                                     picks=mne.pick_types(raw.info, meg=args.sensor_type),
                                      n_fft=args.nfft,
                                      n_overlap=args.noverlap,
                                      tmin=psd_band_t_start_ms / 1000.,
@@ -275,6 +275,7 @@ def maybe_prep_psds(args):
                                      )
 
                 if args.sensor_type == "grad":
+                    # We already only have grad values
                     psds = _merge_grad_data(psds)
 
                 if args.established_bands:
@@ -339,7 +340,5 @@ def maybe_prep_psds(args):
         print("Saving the newly generated dataset")
         saver_loader.save_ds((x, y, info))
         print("--")
-
-
 
     return x, y, info

@@ -3,9 +3,8 @@ from __future__ import print_function, division, with_statement
 import sys, os, subprocess as sp, glob, re
 
 BASE_PATH = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-REMOTE_PATH = '/home/julesgm/COCO'
+REMOTE_PATH = '/home/julesgm/'
 
-assert BASE_PATH == "/home/jules/Documents/COCO_NEURO"
 
 d_target = "helios"
 
@@ -30,7 +29,7 @@ exclude_list = [
 abs_exclude_set = {re.sub("/+", "/", "{}/{}".format(BASE_PATH, rel)) for rel in exclude_list}
 abs_exclude_set.update({re.sub("/+", "/", "{}".format(rel)) for rel in glob.glob(BASE_PATH + "/" + "*.pyc")})
 
-include_set = set([BASE_PATH + "/"])
+include_set = set([BASE_PATH, "/home/jules/.PyCharm2016.1/config/scratches"])
 
 # Doing everything we can to prevent having to do "shell=True"
 cmd = (["rsync",

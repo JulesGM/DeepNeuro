@@ -33,7 +33,7 @@ ARGS_ONLY_NAME = "args_only"
 @click.option("--nfft",               type=int,     default=1000)# 1000 for Quarter established_bands
 @click.option("--fmax",               type=int,     default=100)
 @click.option("--tincr",              type=float,   default=1)
-@click.option("--established_bands",                default="quarter") # True, False, Quarter, Half
+@click.option("--established_bands",                default=True) # True, False, Quarter, Half
 @click.option("--limit",              type=int,     default=None)
 @click.option("--tmin",               type=int,     default=0)
 @click.option("--tmax",               type=int,     default=1000000)
