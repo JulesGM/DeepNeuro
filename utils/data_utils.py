@@ -29,6 +29,7 @@ mne.set_log_level("ERROR")
 
 base_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
+
 class SaverLoader(object):
     def __init__(self, path):
         self._save_path = path
@@ -329,8 +330,9 @@ def maybe_prep_psds(args):
             x[i] = x[i].T
 
             assert len(x[i].shape) == utils.X_Dims.size.value
-            assert x[i].shape[utils.X_Dims.samples_and_times.value] == y[i].shape[0], x[i].shape[utils.X_Dims.samples_and_times.value]  # no_samples
-
+            no_samples_x = x[i].shape[utils.X_Dims.samples_and_times.value]
+            no_samples_y = y[i].shape[0]
+            assert no_samples_x == no_samples_y, (no_samples_x, no_samples_x)
             assert np.all(np.isfinite(x[i]))
 
         # Take any valid file's position information, as all raws [are supposed to] have the same positions.

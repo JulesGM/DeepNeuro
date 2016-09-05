@@ -19,6 +19,16 @@ import utils.data_utils
 import numpy as np
 import click
 
+# ipython like errors
+try:
+    import IPython.core.ultratb
+except ImportError:
+    # No IPython. Use default exception printing.
+    pass
+else:
+    import sys
+    sys.excepthook = IPython.core.ultratb.ColorTB()
+
 
 """
 MNE's logger prints massive amount of useless stuff, and neither mne.set_logging_level(logging.ERROR) or
@@ -33,7 +43,7 @@ ARGS_ONLY_NAME = "args_only"
 @click.option("--nfft",               type=int,     default=1000)# 1000 for Quarter established_bands
 @click.option("--fmax",               type=int,     default=100)
 @click.option("--tincr",              type=float,   default=1)
-@click.option("--established_bands",                default=True) # True, False, Quarter, Half
+@click.option("--established_bands",                default="half") # True, False, "quarter", "half"
 @click.option("--limit",              type=int,     default=None)
 @click.option("--tmin",               type=int,     default=0)
 @click.option("--tmax",               type=int,     default=1000000)
@@ -100,13 +110,11 @@ def lc(ctx, job_type):
 
 
 @main.command(help="- Spatial classification")
-@click.argument("net_type",             default="tflearn_resnet",      type=str)
-@click.option("--res",                  default=(224, 224), type=(int, int)) # to match vgg_cifar
-@click.option("--dropout_keep_prob",    default=1,          type=float)
-@click.option("--learning_rate",        default=0.001,      type=float)
-@click.option("--depth",                default=7,          type=int)
-@click.option("--minibatch_size",       default=256,        type=int)
-@click.option("--filter_scale_factor",  default=2,          type=float)
+@click.argument("net_type",             default="cnn",      type=str)
+@click.option("--res",                  default=(25, 25),   type=(int, int)) # to match vgg_cifar
+@click.option("--dropout_keep_prob",    default=0.50,          type=float)
+@click.option("--learning_rate",        default=0.0002,      type=float)
+@click.option("--minibatch_size",       default=1024,        type=int)
 @click.option("--dry_run",              default=False,      type=bool, is_flag=True)
 @click.option("--test_qty",             default=2048,       type=int)
 @click.option("--load_model",           default=None,)

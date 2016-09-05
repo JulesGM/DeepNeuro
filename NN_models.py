@@ -24,7 +24,7 @@ default_summary_path = os.path.join(base_path, "saves", "tf_summaries")
 class FFNN(NN_utils.AbstractClassifier):
     def __init__(self, x_shape_1, y_shape_1, depth, expected_minibatch_size, width_hidden_layers=2,
                  dropout_keep_prob=1.0, l2_c=0,
-                 summary_writing_path=default_summary_path, activation_factory=NN_utils.relu_layer,):
+                 summary_writing_path=default_summary_path, activation_fn=tf.nn.relu):
         assert False, "NEEDS TO BE TESTED AGAIN BEFORE USE"
         super(self.__class__, self).__init__(summary_writing_path)
         utils.print_func_source(FFNN)
@@ -36,7 +36,7 @@ class FFNN(NN_utils.AbstractClassifier):
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
         self._l2_c = l2_c
 
-        net = activation_factory(self._x, [x_shape_1, width_hidden_layers])
+        net = NN_utils.fc(self._x, width_hidden_layers, activation_fn)
         for _ in xrange(depth - 1):
             net = activation_factory(net, [width_hidden_layers, width_hidden_layers])
             net = tf.nn.dropout(net, self._dropout_keep_prob)
@@ -48,8 +48,8 @@ class FFNN(NN_utils.AbstractClassifier):
 
 
 class CNN(NN_utils.AbstractClassifier):
-    def __init__(self, x_shape, y_shape_1, depth, dropout_keep_prob, filter_scale_factor, expected_minibatch_size,
-                 first_layer_scale_factor=2, pool_every_k=3, summary_writing_path=default_summary_path):
+    def __init__(self, x_shape, y_shape_1, dropout_keep_prob, expected_minibatch_size,
+                 summary_writing_path=default_summary_path):
         super(self.__class__, self).__init__(summary_writing_path)
         utils.print_func_source(CNN.__init__)
 
@@ -59,24 +59,30 @@ class CNN(NN_utils.AbstractClassifier):
         self._lr = tf.placeholder(tf.float32, name="learning_rate")
         self._dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
-        net = self._x
-        for i in xrange(depth):
-            input_depth = net.get_shape().as_list()[3]
-            if i == 0:
-                output_depth = input_depth * first_layer_scale_factor
-            else:
-                output_depth = int(input_depth * filter_scale_factor)
+        mpool = NN_utils.max_pool
 
-            filter_shape = (3, 3, input_depth, output_depth)
-            net = NN_utils.conv_layer(net, filter_shape, 1)
+        def conv(net, n_out):
+            n_in = net.get_shape()[-1].value
+            return NN_utils.conv_layer(net, (3, 3, n_in, n_out), 1, name="conv", non_lin=tf.nn.tanh)
 
-            if i > pool_every_k:
-                # VGG only starts dropout at the second 'conv N times then pool' block
-                net = tf.nn.dropout(net, self._dropout_keep_prob)
+        def flatten(input_op):
+            print(type(input_op))
+            product = np.product(input_op.get_shape().as_list()[1:])
+            return tf.reshape(input_op, [-1, product])
 
-            if pool_every_k is not None and (i + 1) % pool_every_k == 0 and i != 0:
-                net = NN_utils.max_pool(net)
+        import tflearn
 
+        in_ = net = self._x
+        net = conv(net, 64)
+        c0_ = net = tflearn.batch_normalization(net)
+        net = mpool(net)
+
+        net = conv(net, 64)
+        c1_ = tflearn.batch_normalization(net)
+
+
+        net = tf.concat(1, [flatten(tflearn.global_avg_pool(c1_)), flatten(tflearn.global_avg_pool(c0_)), flatten(tflearn.global_avg_pool(in_))]) # lazy densenets
+        net = tflearn.batch_normalization(net)
         self.finish_init(net, y_shape_1, expected_minibatch_size, x_shape, np.float32)
 
 class VGG(NN_utils.AbstractClassifier):

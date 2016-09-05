@@ -13,6 +13,7 @@ import utils
 
 import humanize
 
+import tensorflow.contrib.layers as tflayers
 
 def leaky_relu(activation, alpha=0.01):
     return tf.maximum(alpha * activation, activation)
@@ -22,8 +23,8 @@ def weight_variable(shape, name="weights"):
     # https://arxiv.org/abs/1502.01852
     # http://cs231n.github.io/neural-networks-2/
     with tf.name_scope(name):
-        initial = np.random.randn(*shape) * np.sqrt(2.0 / shape[0])
-        var = tf.Variable(np.float32(initial), name=name)
+        n = (shape[0] + shape[1]) / 2. # aka np.mean(shape)
+        var = tf.Variable(tf.truncated_normal(shape, 0.0, stddev=np.sqrt(2 / n)), name=name)
     return var
 
 
@@ -35,23 +36,16 @@ def biais_variable(shape, name="bias"):
     return var
 
 
-def softmax_layer(input_, shape, name="softmax_layer"):
-    with tf.name_scope(name):
-        w = weight_variable(shape)
-        b = biais_variable([shape[1]])
-        with tf.name_scope("activations"):
-            a = tf.nn.bias_add(tf.matmul(input_, w), b)
-        h = tf.nn.softmax(a)
-    return h, (w, b)
 
-
-def relu_layer(input_, shape, name="relu_layer"):
+def fc(input_, out_, activation, name="fully_connected"):
+    in_ = input_.get_shape()[-1].value
+    shape = [in_, out_]
     with tf.name_scope(name):
         w = weight_variable(shape)
         b = biais_variable([shape[1]])
         with tf.name_scope("activations"):
             a = tf.matmul(input_, w) + b
-        h = tf.nn.relu(a)
+        h = activation(a)
     return h
 
 
@@ -71,13 +65,16 @@ def bn_conv_layer(input_, filter_shape, stride, non_lin=tf.nn.relu):
     return out
 
 
-def conv_layer(input_, filter_shape, stride, name="conv_layer", non_lin=tf.nn.relu):
+def conv_layer(input_, filter_shape, stride, name, non_lin, dropout_keep_prob=1):
+
     with tf.name_scope(name):
         filter_ = weight_variable(filter_shape)
         biais_ = biais_variable([filter_shape[3]])
         conv = tf.nn.conv2d(input_, filter=filter_, strides=[1, stride, stride, 1], padding="SAME")
         with tf.name_scope("activation"):
             activation = tf.nn.bias_add(conv, biais_)
+
+        activation = tf.nn.dropout(activation, dropout_keep_prob)
         out = non_lin(activation)
     return out
 
@@ -168,18 +165,7 @@ class AbstractClassifier(object):
         self._merged = tf.merge_all_summaries()
 
         AbstractClassifier.layer_sizes()
-    """
-    @staticmethod
-    def guess_memory_use(input_shape, input_dtype, minibatch_size):
-        # only supports fully connected layers.
-        variables = tf.all_variables()
-        tf_sizes = {tf.float16_ref: 2, tf.float32_ref: 4, tf.float64_ref: 8}
-        np_sizes = {np.float16: 2, np.float32: 4, np.float64: 8}
-        parameter_memory = sum([np.prod(v.get_shape().as_list()) * tf_sizes[v.dtype] for v in variables])
-        input_memory = np.prod(input_shape) * minibatch_size * np_sizes[input_dtype]
-        # activation_memory = sum([v.get_shape().as_list()[3] * sizes[v.dtype] for v in variables]) * minibatch_size
-        return int(parameter_memory + input_memory)
-    """
+
     @staticmethod
     def layer_sizes():
         variables = tf.all_variables()
@@ -216,7 +202,9 @@ class AbstractClassifier(object):
         total_l2 = 0
         surface = 0
 
-        counts = None
+        pred_counts = None
+        label_counts = None
+        score_means = []
         for i in range(0, test_qty, minibatch_size):
             surface += minibatch_size
 
@@ -230,8 +218,8 @@ class AbstractClassifier(object):
                 feed_dict[self._dropout_keep_prob] = 1.0
             maybe_l2 = vars(self).get("_l2", tf.constant(0))
 
-            merged,            accuracy,       loss,       predictions,      labels,        right_predictions,       l2 = sess.run(
-                [self._merged, self._accuracy, self._loss, self._predictions, self._labels, self._right_predictions, maybe_l2],
+            merged,            accuracy,       loss,       predictions,      scores,        labels,       right_predictions,       l2 = sess.run(
+                [self._merged, self._accuracy, self._loss, self._predictions, self._score, self._labels, self._right_predictions, maybe_l2],
                 feed_dict=feed_dict,
                 options=run_options,
                 run_metadata=run_metadata,)
@@ -240,7 +228,9 @@ class AbstractClassifier(object):
             total_accuracy += accuracy * minibatch_size
             total_l2 += l2 * minibatch_size
 
-            counts = AbstractClassifier._update_counts(np.unique(predictions, return_counts=True), counts)
+            score_means.append(np.mean(scores[:, 0]))
+            pred_counts = AbstractClassifier._update_counts(np.unique(predictions, return_counts=True), pred_counts)
+            label_counts = AbstractClassifier._update_counts(np.unique(labels, return_counts=True), label_counts)
             writer.add_summary(merged, epoch)
 
         tag = "epoch{}".format(epoch)
@@ -253,10 +243,12 @@ class AbstractClassifier(object):
             print_later("\t- {} loss:      {}".format(cv_set, total_loss/surface))
             print_later("\t- {} l2:        {}".format(cv_set, total_l2/surface))
 
-            if len(counts.keys()) == 1:
+            if len(pred_counts.keys()) == 1:
                 print_later(">> There seems to only be one type of unique values in the {} predictions.".format(cv_set))
-            print_later("\t- {} prediction counts: {}".format(cv_set, counts))
 
+            print_later("\t- {} prediction counts: {}".format(cv_set, pred_counts))
+            print_later("\t- {} expected counts: {}".format(cv_set, label_counts))
+            print_later("\t- {} predictions pre_argmax mean: {}".format(cv_set, np.mean(score_means)))
         return "\n".join(print_later_text_list)
 
     def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate, test_qty, verbose=True):

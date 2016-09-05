@@ -17,6 +17,7 @@ import NN_models
 
 # External
 import tflearn
+import tensorflow.contrib.slim as tfslim
 import tensorflow as tf
 import numpy as np
 import scipy.interpolate
@@ -123,25 +124,52 @@ def _make_image_save_name(res, sensor_type, nfft, fmax, tincr, use_established_b
     args = ["_".join([str(d) for d in res]), sensor_type, nfft, fmax, tincr, use_established_bands]
     return "_".join([str(x) for x in args])
 
+from tflearn.metrics import Metric
+class Prediction_Counts(Metric):
+    """ Prints the count of each category of prediction that is present in the predictions.
+    Can be useful to see, for example, to see if the model only gives one type of predictions,
+    or if the predictions given are in the expected proportions """
 
-class prediction_counts(tflearn.metrics.Metric):
-    """ Prints the number of each kind of prediction """
-    def __init__(self, name=None):
-        super(Counts, self).__init__(name)
+    def __init__(self, inner_metric, name=None):
+        super(Prediction_Counts, self).__init__(name)
+        self.inner_metric = inner_metric
 
     def build(self, predictions, targets, inputs=None):
         """ Prints the number of each kind of prediction """
         self.built = True
         pshape = predictions.get_shape()
+        self.inner_metric.build(predictions, targets, inputs)
 
-        if len(pshape) == 1 or (len(pshape) == 2 and int(pshape[1]) == 1):
-            self.name = self.name or "binary_counts"
-            self.tensor = tf.unique_with_counts(predictions)
-        else:
-            self.name = self.name or "categorical_counts"
-            self.tensor = self.tensor = tf.unique_with_counts(tf.argmax(predictions, dimension=1))
+        with tf.name_scope(self.name):
+            if len(pshape) == 1 or (len(pshape) == 2 and int(pshape[1]) == 1):
+                self.name = self.name or "binary_prediction_counts"
+                y, idx, count = tf.unique_with_counts(tf.argmax(predictions))
+                self.tensor = tf.Print(self.inner_metric, [y, count, ], name=self.inner_metric.name)
 
-        self.tensor.m_name = self.name
+            else:
+                self.name = self.name or "categorical_prediction_counts"
+                # y, idx, count = tf.unique_with_counts(tf.argmax(predictions, dimension=1))
+                self.tensor = self.inner_metric.tensor
+
+prediction_counts = Prediction_Counts
+
+
+class multiple_metrics(tflearn.metrics.Metric):
+    """ """
+    def __init__(self, metrics_obj, name=None):
+        super(multiple_metrics, self).__init__(name)
+        self.metrics = metrics_obj
+
+    def build(self, predictions, targets, inputs=None):
+        """  """
+        self.built = True
+
+        for metric in self.metrics:
+            metric.build(predictions, targets, inputs)
+
+        self.tensor = tf.pack([metric.tensor for metric in self.metrics])
+
+        self.name = self.name or "multiple_metrics: " + tf.reduce_join([metric.name for metric in self.metrics])
 
 
 def spatial_classification(args):
@@ -159,6 +187,7 @@ def spatial_classification(args):
         prepared_x = hdf5_saver_loader.load_ds()
         print("Done unpickling.")
         print("--")
+
     else:
         start = time.time()
         make_interpolated_data(x=args.x, res=args.res, method="cubic", info=args.info,
@@ -186,58 +215,129 @@ def spatial_classification(args):
     x_shape = training_prepared_x.shape
     y_shape_1 = training_y.shape[1]
 
-    if args.net_type == "tflearn_resnet":
-        # https://github.com/tflearn/tflearn/blob/master/examples/images/residual_network_cifar10.py
 
+    if args.net_type == "keras_dense":
+        os.environ["KERAS_BACKEND"] = "tensorflow"
+
+        import keras
+        from keras.layers import Conv2D, Flatten, Dense, normalization
+
+        train_data = (training_prepared_x, training_y)
+        valid_data = (validation_prepared_x, validation_y)
+
+        model = keras.models.Sequential()
+        model.add(keras.layers.InputLayer(input_shape=(list(train_data[0].shape[1:])), ))
+
+        model.add(Flatten())
+        model.add(Dense(1028, init="normal", activation="softmax"))
+        model.add(Dense(1028, init="normal", activation="softmax"))
+        model.add(Dense(2, init="normal", activation="softmax"))
+
+        from keras import backend as K
+
+        def values_k(k, is_pred=True):
+            def values(y_true, y_pred):
+                work_on = y_pred if is_pred else y_true
+                pre_gather = K.sum(K.argmax(work_on, axis=1))
+
+                if k >= 0:
+                    return K.gather(pre_gather, k)
+                else:
+                    return K.shape(pre_gather)[0]
+                    #return K.gather(K.shape(pre_gather), 0)
+
+            return values
+
+
+        model.compile(loss="categorical_crossentropy", optimizer="rmsprop", metrics=["accuracy",
+                                                                    values_k(-1, True),
+                                                                    #values_k(1, True),values_k(0, False), values_k(1, False)
+                                                                    ])
+
+        model.fit(*train_data, batch_size=args.minibatch_size,
+                  validation_data=valid_data, nb_epoch=10000, shuffle="batch")
+
+
+    elif args.net_type == "keras_conv":
+        os.environ["KERAS_BACKEND"] = "tensorflow"
+        import keras
+        from keras.layers import Conv2D, Flatten, Dense, normalization
+
+
+        train_data = (training_prepared_x[()].swapaxes(3, 2).swapaxes(2,1), training_y[()])
+        valid_data = (validation_prepared_x[()].swapaxes(3, 2).swapaxes(2,1), validation_y[()])
+
+        train_idx = [np.random.randint(0, train_data[1].shape[0]) for _ in range(100)]
+        valid_idx = [np.random.randint(0, valid_data[1].shape[0]) for _ in range(100)]
+        print(train_data[1][train_idx])
+        print(valid_data[1][valid_idx])
+
+        model = keras.models.Sequential()
+        model.add(keras.layers.InputLayer(input_shape=(list(train_data[0].shape[1:])), input_dtype=np.float32))
+        model.add(Conv2D(32, 3, 3, init="he_normal", activation="tanh",),)
+        model.add(normalization.BatchNormalization())
+
+        model.add(Conv2D(32, 3, 3, init="he_normal", activation="tanh", ))
+        model.add(normalization.BatchNormalization())
+
+
+        model.add(Flatten())
+        model.add(Dense(2, init="he_normal", activation="softmax"))
+        model.compile(loss="categorical_crossentropy", optimizer="nadam", metrics=["accuracy"])
+
+        model.fit(*train_data, batch_size=args.minibatch_size,
+                  validation_data=train_data, nb_epoch=10000, shuffle="batch")
+
+    elif args.net_type == "tflearn_resnet":
+        # https://github.com/tflearn/tflearn/blob/master/examples/images/residual_network_cifar10.py
 
         assert(len(x_shape) == 4)
         assert(all([len(prepared_x[i].shape) == 4 for i in range(2)]))
 
-        net = tflearn.input_data(x_shape[1:])
-        print("Shape is: {}".format(net.get_shape().as_list()))
+        train_data = [training_prepared_x, training_y]
+        valid_data = [validation_prepared_x, validation_y]
+
+        train_mean = np.mean(train_data[0])
+        train_std = np.std(train_data[0])
+        train_data[0] = (train_data[0] - train_mean) / train_std
+        valid_data[0] = (valid_data[0] - train_mean) / train_std
+
+        net = tflearn.input_data([None] + list(x_shape[1:]))
         shape_width_test = len(net.get_shape().as_list())
-        assert shape_width_test == 4, "expected 4, got {}".format(shape_width_test)
+        assert shape_width_test == 4, shape_width_test
 
-        net = tflearn.conv_2d(net, 32, 3, weight_decay=0.0001)
-        net = tflearn.dropout(net, args.dropout_keep_prob)
-        net = tflearn.batch_normalization(net)
+        #net = tflearn.conv_2d(net, 32, 3, weight_decay=0.0001, activation="tanh")
+        #net = tflearn.residual_block(net, 32, 3, weight_decay=0.0001, activation="tanh")
 
-        net = tflearn.residual_block(net, 2, 32, bias=False)
-        net = tflearn.dropout(net, args.dropout_keep_prob)
-        net = tflearn.max_pool_2d(net, 3, strides=2)
-        assert net.get_shape().as_list()[1:] == [112, 112, 32], net.get_shape().as_list()
-
-        net = tflearn.residual_block(net, 2, 64, bias=False)
-        net = tflearn.dropout(net, args.dropout_keep_prob)
-        net = tflearn.max_pool_2d(net, 3, strides=2)
-        assert net.get_shape().as_list()[1:] == [56, 56, 64], net.get_shape().as_list()
-
-        net = tflearn.residual_block(net, 1, 128, bias=False)
-        net = tflearn.dropout(net, args.dropout_keep_prob)
-        net = tflearn.max_pool_2d(net, 3, strides=2)
-        assert net.get_shape().as_list()[1:] == [28, 28, 128], net.get_shape().as_list()
-
-        net = tflearn.batch_normalization(net)
-        net = tflearn.activation(net, 'relu')
-        net = tflearn.global_avg_pool(net)
-
+        #net = tflearn.batch_normalization(net)
         # Regression
-        net = tflearn.fully_connected(net, 2, activation='softmax')
-        mom = tflearn.Momentum(0.1, lr_decay=0.1, decay_step=32000, staircase=True)
-        net = tflearn.regression(net, optimizer=mom, loss='categorical_crossentropy')
+
+        net = tflearn.fully_connected(net, 1028, activation='relu', bias=False)
+        net = tflearn.fully_connected(net, 1028, activation='relu', bias=False)
+        net = tflearn.batch_normalization(net, gamma=0)
+        net = tflearn.fully_connected(net, 2, activation='softmax', bias=False)
+
+        net = tflearn.regression(net, optimizer=tflearn.Adam(), loss='categorical_crossentropy',
+                                metric=Prediction_Counts(tflearn.metrics.Accuracy())
+                                 )
 
         # Training
         model = tflearn.DNN(net, max_checkpoints=2, tensorboard_verbose=1, clip_gradients=0,
-                            checkpoint_path=(args.model_save_path if args.model_save_path else 'model_tflearn_resnet')
-                            )
+                            checkpoint_path=(args.model_save_path if
+                                             args.model_save_path else
+                                             'model_tflearn_resnet'))
 
         if args.load_model:
             model.load(args.load_model)
-            print("Model metrics:\n{}\n".format(model.evaluate(validation_prepared_x, validation_y, 32)))
+            print("Model metrics:\n{}\n".format(model.evaluate(validation_prepared_x,
+                                                               validation_y, 32)))
 
-        model.fit(training_prepared_x, training_y,  n_epoch=500, shuffle=True,
-                  validation_set=(validation_prepared_x, validation_y),
-                  show_metric=[True, tflearn.metrics.accuracy, prediction_counts], batch_size=32,)
+
+        model.fit(*train_data, n_epoch=500000, shuffle=True,
+                  validation_set=valid_data,
+                  show_metric=True,
+                  batch_size=1028)
+
     elif args.net_type == "tflearn_bn_vgg":
         # Our own vgg remix with bn
         print(x_shape)
@@ -344,7 +444,7 @@ def spatial_classification(args):
                   show_metric=True, batch_size=32, )
 
     elif args.net_type == "tflearn_lstm": # should really be tflearn_lstm_resnet, but is too long for the moment
-
+        assert False
         maxlen = 128
         dataset_size = 500000
         seq_X = None
@@ -407,29 +507,36 @@ def spatial_classification(args):
     elif args.net_type == "cnn":
         print("cnn")
 
+        train_data = [training_prepared_x[()], training_y]
+        valid_data = [validation_prepared_x[()], validation_y]
+
+        train_mean = np.mean(train_data[0])
+        train_std = np.std(train_data[0])
+
+        train_data[0] = (train_data[0] - train_mean) / train_std
+        valid_data[0] = (valid_data[0] - train_mean) / train_std
+
         summary_path = os.path.join(base_path, "saves", "tf_summaries", "cnn_" + image_name + "_" +
                                     str(random.randint(0, 1000000000000)))
-        model = NN_models.CNN(x_shape, y_shape_1, depth=args.depth, dropout_keep_prob=args.dropout_keep_prob,
-                              filter_scale_factor=args.filter_scale_factor, summary_writing_path=summary_path,
-                              expected_minibatch_size=args.minibatch_size)
-        if not args.dry_run:
 
-            model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y, n_epochs=10000000,
+        model = NN_models.CNN(x_shape, y_shape_1, dropout_keep_prob=args.dropout_keep_prob,
+                              summary_writing_path=summary_path, expected_minibatch_size=args.minibatch_size)
+
+        model.fit(train_data[0], train_data[1], valid_data[0], train_data[1], n_epochs=10000000,
                       minibatch_size=args.minibatch_size, learning_rate=args.learning_rate, test_qty=args.test_qty)
-        else:
-            print(">>>>> NO FITTING, WAS A DRY RUN")
+
     elif args.net_type == "resnet":
         print("resnet")
         summary_path = os.path.join(base_path, "saves", "tf_summaries", "resnet_" + image_save_name + "_" +
                                     str(random.randint(0, 1000000000000)))
-        model = NN_models.ResNet(x_shape, y_shape_1, dropout_keep_prob=args.dropout_keep_prob,
+
+        model = NN_models.ResNet(x_shape, y_shape_1,
+                                 dropout_keep_prob=args.dropout_keep_prob,
                                  summary_writing_path=summary_path,
                                  expected_minibatch_size=args.minibatch_size)
-        if not args.dry_run:
-            model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y,
-                      n_epochs=10000000, minibatch_size=args.minibatch_size, learning_rate=args.learning_rate, test_qty=args.test_qty)
-        else:
-            print(">>>>> NO FITTING, WAS A DRY RUN")
+
+        model.fit(training_prepared_x, training_y, validation_prepared_x, validation_y, n_epochs=10000000,
+                  minibatch_size=args.minibatch_size, learning_rate=args.learning_rate, test_qty=args.test_qty)
 
 
     else:
