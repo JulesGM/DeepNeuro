@@ -18,5 +18,5 @@ skl, support vector machines, svm,
 random forests, neural networks, nn, 
 convnets, cnn, tensorflow, 
 tf, neuroscience, neuroimaging, 
-neuro psychiatry
+neuro psychiatry, resnet, densenet
 )
