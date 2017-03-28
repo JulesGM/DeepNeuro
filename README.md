@@ -9,4 +9,4 @@ Psychology Department
 University of Montreal 
 http://www.karimjerbi.com/
 
-(Keywords : mne, magnetoencephalography, meg, python, machine learning, ml, deep learning, dl, scikit-learn, skl, support vector machines, svm, random forests, neural nets, nn, convnets, cnn, tensorflow)
+(Keywords : mne, magnetoencephalography, meg, python, machine learning, ml, deep learning, dl, scikit-learn, skl, support vector machines, svm, random forests, neural networks, nn, convnets, cnn, tensorflow, tf, neuroscience, neuroimagery, neuro psychiatry)
