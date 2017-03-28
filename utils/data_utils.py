@@ -361,7 +361,6 @@ def maybe_prep_psds(args):
                 assert np.all(np.isfinite(x[i]))
 
         else:
-            assert False
             x = [[], [], []]
             assert len(list_x) > 0, len(list_x)
             for i in xrange(3):

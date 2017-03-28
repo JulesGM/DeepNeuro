@@ -24,7 +24,7 @@ def make_samples_linear(x):
     return linear_x
 
 
-def linear_classification(x, y, job):
+def fully_connected(x, y, job):
     linear_x = [None, None, None]
 
     print("Training shape:")
@@ -58,14 +58,6 @@ def linear_classification(x, y, job):
                 x_shape_1=linear_x[0].shape,
                 y_shape_1=2, depth=1, width_hidden_layers=10,
                 dropout_keep_prob=0.5, l2_c=1))
-
-    if "LSTM" in job:
-        classifiers.append(
-            nn_models.LSTM(
-                x_shape=linear_x[0].shape,
-                y_shape_1=2,
-                seq_len=None,
-                expected_minibatch_size=512))
 
     if "SVM" in job:
         c_const = 10.

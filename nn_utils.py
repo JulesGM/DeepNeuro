@@ -15,6 +15,7 @@ import humanize
 
 import tensorflow.contrib.layers as tflayers
 
+
 def leaky_relu(activation, alpha=0.01):
     return tf.maximum(alpha * activation, activation)
 
@@ -27,12 +28,14 @@ def weight_variable(shape, name="weights"):
         var = tf.Variable(tf.truncated_normal(shape, 0.0, stddev=np.sqrt(2 / n)), name=name)
     return var
 
+
 def biais_variable(shape, name="bias"):
     # http://cs231n.github.io/neural-networks-2/
     with tf.name_scope(name):
         initial = tf.zeros(shape)
         var = tf.Variable(initial, name=name)
     return var
+
 
 def fc(input_, out_, activation, name="fully_connected"):
     in_ = input_.get_shape()[-1].value
@@ -44,6 +47,7 @@ def fc(input_, out_, activation, name="fully_connected"):
             a = tf.matmul(input_, w) + b
         h = activation(a)
     return h
+
 
 def bn_conv_layer(input_, filter_shape, stride, non_lin=tf.nn.relu):
     # http://arxiv.org/pdf/1502.03167v3.pdf
@@ -60,6 +64,7 @@ def bn_conv_layer(input_, filter_shape, stride, non_lin=tf.nn.relu):
         out = non_lin(batch_norm)
     return out
 
+
 def conv_layer(input_, filter_shape, stride, name, non_lin, dropout_keep_prob=1):
     with tf.name_scope(name):
         filter_ = weight_variable(filter_shape)
@@ -71,6 +76,7 @@ def conv_layer(input_, filter_shape, stride, name, non_lin, dropout_keep_prob=1)
         activation = tf.nn.dropout(activation, dropout_keep_prob)
         out = non_lin(activation)
     return out
+
 
 def residual_block(input_, output_depth, down_sample, projection=False, non_lin=tf.nn.relu):
     # https://arxiv.org/abs/1512.03385
@@ -98,6 +104,7 @@ def residual_block(input_, output_depth, down_sample, projection=False, non_lin=
             input_layer = input_
         res = conv2 + input_layer
     return res
+
 
 class AbstractClassifier(object):
     def __init__(self, summary_writing_path):

@@ -49,7 +49,7 @@ base_path = os.path.dirname(os.path.realpath(__file__))
 @click.option("--sensor_type",        type=str,     default=True)
 @click.option("--noverlap",           type=int,     default=0)
 @click.option("--data_path",          type=str,     default=os.path.join(os.environ["HOME"], "aut_gamma"))
-@click.option("--is_time_dependant",  type=bool,    default=False)
+@click.option("--is_time_dependant",  type=bool,    default=True)
 @click.option("--args_only",          type=bool,    default=False, is_flag=True)
 @click.pass_context
 def main(ctx, **args):
@@ -94,10 +94,28 @@ def main(ctx, **args):
     print("--")
 
 
-@main.command(help="- Linear classification")
+@main.command(help="- Sequence classification")
+@click.argument("job_type", type=str, nargs=-1)
+@click.pass_context
+def sequence(ctx, job_type):
+    print("Spatial Classification args:")
+    click_positional = {"job_type": job_type}
+    utils.print_args(click_positional, None)
+    if ctx.obj["main"]["args_only"]:
+        return
+
+    assert ctx.obj["main"]["is_time_dependant"]
+
+    # We put the imports to classification managers inside of the function to not trigger
+    # the very slow import of tensorflow even when just showing the help text, for example
+    import sequence_classification
+    sequence_classification.sequence_classification(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
+
+
+@main.command(help="- single dimension classification")
 @click.argument("job_type",             type=str,          nargs=-1)
 @click.pass_context
-def lc(ctx, job_type):
+def single_dim_classification(ctx, job_type):
     print("Spatial Classification args:")
     click_positional = {"job_type": job_type}
     utils.print_args(click_positional, None)
@@ -106,8 +124,8 @@ def lc(ctx, job_type):
 
     # We put the imports to classification managers inside of the function to not trigger
     # the very slow import of tensorflow even when just showing the help text, for example
-    import linear_classification
-    linear_classification.linear_classification(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
+    import fully_connected
+    fully_connected.fully_connected(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
 
 
 @main.command(help="- Spatial classification")
@@ -121,7 +139,7 @@ def lc(ctx, job_type):
 @click.option("--load_model",           default=None,)
 @click.option("--model_save_path",      default=None,)
 @click.pass_context
-def sc(ctx, net_type, **args):
+def spatial(ctx, net_type, **args):
     # As it it quite common to leave quite a few options at their default values,
     # it is helpful to print all the values to make it less likely a default has an unexpected value.
     print("Spatial Classification args:")
@@ -145,7 +163,6 @@ def sc(ctx, net_type, **args):
     # We put the imports to classification managers inside of the function to not trigger
     # the very slow import of tensorflow even when just showing the help text, for example
     import spatial_classification
-
     spatial_classification.spatial_classification(args)
 
 if __name__ == "__main__": main(obj={})

@@ -25,18 +25,22 @@ import tflearn
 base_path = os.path.dirname(__file__)
 default_summary_path = os.path.join(base_path, "saves", "tf_summaries")
 
+
 # Shorthands
 def conv(net, n_out, activation=tf.nn.tanh):
     n_in = net.get_shape()[-1].value
     return nn_utils.conv_layer(net, (3, 3, n_in, n_out), 1, name="conv", non_lin=activation)
+
 
 def flatten(input_op):
     print(type(input_op))
     product = np.product(input_op.get_shape().as_list()[1:])
     return tf.reshape(input_op, [-1, product])
 
+
 def max_pool(bottom, name=None):
     return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
+
 
 class CNN(nn_utils.AbstractClassifier):
     """
@@ -76,6 +80,7 @@ class CNN(nn_utils.AbstractClassifier):
 # OLD CODE NOT TESTED IN A WHILE --- NEEDS TO BE RE-TESTED
 ##############################################################################
 
+
 class FFNN(nn_utils.AbstractClassifier):
     def __init__(self, x_shape_1, y_shape_1, depth, expected_minibatch_size, width_hidden_layers=2,
                  dropout_keep_prob=1.0, l2_c=0,
@@ -99,6 +104,7 @@ class FFNN(nn_utils.AbstractClassifier):
         self._l2 = l2_c * w_squares
 
         self.finish_init(net, expected_minibatch_size)
+
 
 class VGG(nn_utils.AbstractClassifier):
     """
@@ -178,6 +184,7 @@ class VGG(nn_utils.AbstractClassifier):
         """
         self.finish_init(net, y_shape_1, expected_minibatch_size, x_shape, np.float32)
 
+
 class ResNet(nn_utils.AbstractClassifier):
     def __init__(self, x_shape, y_shape_1, dropout_keep_prob, expected_minibatch_size,
                  summary_writing_path=default_summary_path):
@@ -202,6 +209,7 @@ class ResNet(nn_utils.AbstractClassifier):
         top = tf.reduce_mean(net, [1, 2])
 
         self.finish_init(top, y_shape_1, expected_minibatch_size, x_shape, np.float32)
+
 
 class LSTM(nn_utils.AbstractClassifier):
     @staticmethod
