@@ -5,7 +5,7 @@ from six.moves import range as xrange
 from six.moves import zip as izip
 
 import utils
-import NN_models
+import nn_models
 import numpy as np
 
 # Sklearn imports
@@ -18,12 +18,16 @@ import sklearn.preprocessing
 
 
 def make_samples_linear(x):
-    linear_x = x.reshape(x.shape[utils.X_Dims.samples_and_times.value], x.shape[utils.X_Dims.fft_ch.value] * x.shape[utils.X_Dims.sensors.value])
+    target_shape = (x.shape[utils.X_Dims.samples_and_times.value], x.shape[utils.X_Dims.fft_ch.value] * x.shape[utils.X_Dims.sensors.value])
+    print("target_shape: {}".format(target_shape))
+    linear_x = x.reshape(*target_shape)
     return linear_x
 
 
 def linear_classification(x, y, job):
     linear_x = [None, None, None]
+
+    print("Training shape:")
 
     for i in xrange(3):
         linear_x[i] = make_samples_linear(x[i])
@@ -48,34 +52,63 @@ def linear_classification(x, y, job):
 
     print("Creating the classifiers")
 
-    if job == "NN":
-        classifiers = [NN_models.FFNN(
-            x_shape_1=linear_x[0].shape, y_shape_1=2,
-            depth=1, width_hidden_layers=10,
-            dropout_keep_prob=0.5, l2_c=1)]
+    if "NN" in job:
+        classifiers.append(
+            nn_models.FFNN(
+                x_shape_1=linear_x[0].shape,
+                y_shape_1=2, depth=1, width_hidden_layers=10,
+                dropout_keep_prob=0.5, l2_c=1))
 
-    elif job == "SVM":
-        c_const = 10.
-        for c_exp in xrange(-10, 19, 2):
-            classifiers.append(SVC(C=c_const ** c_exp, kernel="linear", verbose=True, max_iter=1))
+    if "LSTM" in job:
+        classifiers.append(
+            nn_models.LSTM(
+                x_shape=linear_x[0].shape,
+                y_shape_1=2,
+                seq_len=None,
+                expected_minibatch_size=512))
 
-    elif job == "rbf":
+    if "SVM" in job:
         c_const = 10.
         gamma_const = 10.
-        for c_exp in xrange(-2, 6, 2):
-            for gamma_exp in xrange(-30, 0, 3):
-                classifiers.append(SVC(C=c_const ** c_exp, kernel="rbf", gamma=gamma_const ** gamma_exp, verbose=True, max_iter=1000))
 
-    elif job == "KNN":
+        for c_exp in xrange(-10, 10, 2):
+            for gamma_exp in xrange(-10, 10, 2):
+                classifiers.append(
+                    SVC(C=c_const ** c_exp,
+                        gamma=gamma_const ** gamma_exp,
+                        kernel="linear",
+                        #verbose=False,
+                        verbose=True,
+                        max_iter=300
+                        ))
+
+    if "rbf" in job:
+        c_const = 10.
+        gamma_const = 10.
+
+        for c_exp in xrange(-10, 10, 3):
+            for gamma_exp in xrange(-10, 10, 3):
+                for degree in xrange(3, 7, 2):
+                    classifiers.append(
+                        SVC(C=c_const ** c_exp,
+                            gamma=gamma_const ** gamma_exp,
+                            degree=degree,
+                            kernel="rbf",
+                            #verbose=False,
+                            verbose=True,
+                            max_iter=300
+                            ))
+
+    if "KNN" in job:
         for metric in ["minkowski", "euclidean", "manhattan", "chebyshev", "wminkowski", "seuclidean", "mahalanobis"]:
             for knn_exp in xrange(6):
                 classifiers.append(KNeighborsClassifier(n_neighbors=2.**knn_exp, metric=metric))
 
-    elif job == "RandomForests":
+    if "RandomForests" in job:
         for rf_n_estimators_exp in xrange(10):
             classifiers.append(RandomForestClassifier(n_estimators =2. ** rf_n_estimators_exp ))
 
-    elif job == "SKL_LR":
+    if "SKL_LR" in job:
         tol_const = 10.
         c_const = 10.
         for tol_exp in xrange(-5, -3, 1):
@@ -83,31 +116,31 @@ def linear_classification(x, y, job):
                 classifiers.append(logistic.LogisticRegression(max_iter=10000, verbose=10, tol=tol_const ** tol_exp,
                                                                C=c_const ** c_exp))
 
+    assert len(classifiers) > 0, "No classifier to test."
+
     print("--")
-    one_hot_set = {NN_models.FFNN}
+    one_hot_set = {nn_models.FFNN}
     print("Doing linear classification")
-
     for classifier in classifiers:
-        if type(classifier) in one_hot_set:
-            one_hot_y = [utils.to_one_hot(_y, 2) for _y in y[:2]]
-
-            # def fit(self, train_x, train_y, valid_x, valid_y, n_epochs, minibatch_size, learning_rate):
-            classifier.fit(
-                train_x=linear_x[0],    train_y=one_hot_y[0],
-                valid_x=linear_x[1],    valid_y=one_hot_y[1],
-                n_epochs=1000000,       minibatch_size=1028,
-                learning_rate=0.0001)
-        else:
-
-            #print("\t- Fitting the model")
+        # If it's an sklearn classifier..
+        if isinstance(classifier, sklearn.base.ClassifierMixin):
             cl = classifier.fit(training_x, training_y)
-            assert cl is classifier
-            #print("\t- Making predictions and calculating the accuracy scores")
+            # print("\t- Making predictions and calculating the accuracy scores")
             preds_1 = cl.predict(valid_x)
             print("\t- Training score:   {}".format(cl.score(training_x, training_y)))
             print("\t- Valid score:      {}".format(cl.score(valid_x, valid_y)))
             print("\t- valid avg:        {}".format(np.mean(preds_1)))
             print("\t- classif obj:      {}".format(cl))
             print("\t--")
+
+        else:
+            if type(classifier) in one_hot_set:
+                y = [utils.to_one_hot(_y, 2) for _y in y[:2]]
+
+            classifier.fit(
+                train_x=linear_x[0],    train_y=y[0],
+                valid_x=linear_x[1],    valid_y=y[1],
+                n_epochs=1000000,       minibatch_size=1028,
+                learning_rate=0.0001)
 
 

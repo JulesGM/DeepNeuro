@@ -19,7 +19,7 @@ import utils.data_utils
 import numpy as np
 import click
 
-# ipython like errors
+# ipython like formatted errors
 try:
     import IPython.core.ultratb
 except ImportError:
@@ -29,7 +29,6 @@ else:
     import sys
     sys.excepthook = IPython.core.ultratb.ColorTB()
 
-
 """
 MNE's logger prints massive amount of useless stuff, and neither mne.set_logging_level(logging.ERROR) or
 logging.basicConfig(level=logging.ERROR) seem to be working.
@@ -37,22 +36,23 @@ logging.basicConfig(level=logging.ERROR) seem to be working.
 logger = logging.getLogger('mne')
 logger.disabled = True
 base_path = os.path.dirname(os.path.realpath(__file__))
-ARGS_ONLY_NAME = "args_only"
+
 
 @click.group(invoke_without_command=True)
-@click.option("--nfft",               type=int,     default=1000)# 1000 for Quarter established_bands
-@click.option("--fmax",               type=int,     default=100)
+@click.option("--nfft",               type=int,     default=200)# 1000 for Quarter established_bands
+@click.option("--fmax",               type=int,     default=200)
 @click.option("--tincr",              type=float,   default=1)
-@click.option("--established_bands",                default="half") # True, False, "quarter", "half"
+@click.option("--established_bands",                default=False) # True, False, "quarter", "half"
 @click.option("--limit",              type=int,     default=None)
 @click.option("--tmin",               type=int,     default=0)
 @click.option("--tmax",               type=int,     default=1000000)
-@click.option("--sensor_type",        type=str,     default="grad")
+@click.option("--sensor_type",        type=str,     default=True)
 @click.option("--noverlap",           type=int,     default=0)
 @click.option("--data_path",          type=str,     default=os.path.join(os.environ["HOME"], "aut_gamma"))
-@click.option("--" + ARGS_ONLY_NAME,  type=bool,    default=False, is_flag=True)
+@click.option("--is_time_dependant",  type=bool,    default=False)
+@click.option("--args_only",          type=bool,    default=False, is_flag=True)
 @click.pass_context
-def main(ctx, **click_options):
+def main(ctx, **args):
     if ctx.invoked_subcommand is None:
         print("############################################################################################\n"
               "\n   Warning : \n"
@@ -62,10 +62,11 @@ def main(ctx, **click_options):
               "############################################################################################")
 
     print("\nArgs:")
-    utils.print_args(None, click_options)
+    utils.print_args(None, args)
+    ctx.obj["main"] = args
+    args = Namespace(**args) # Namespaces are easier to manipulate
 
-    ctx.obj["main"] = click_options
-    if click_options[ARGS_ONLY_NAME]:
+    if args.args_only:
         return
 
     if six.PY3:
@@ -74,10 +75,10 @@ def main(ctx, **click_options):
     json_split_path = os.path.join(base_path, "fif_split.json")
 
     if not os.path.exists(json_split_path):
-        raise RuntimeError("Couldn't find fif_split.json. Should be generated with ./generate_split.py at the beginning"
-                           " of the data exploration, and then shared.")
+        raise RuntimeError("Couldn't find fif_split.json. Should be generated with ./generate_split.py"
+                           "at the beginning of the data exploration, and then shared.")
 
-    x, y, sample_info = utils.data_utils.maybe_prep_psds(Namespace(**click_options))
+    x, y, sample_info = utils.data_utils.maybe_prep_psds(args)
 
     ctx.obj["main"]["x"] = x
     ctx.obj["main"]["y"] = y
@@ -94,13 +95,13 @@ def main(ctx, **click_options):
 
 
 @main.command(help="- Linear classification")
-@click.argument("job_type",             type=str,         default="SVM")
+@click.argument("job_type",             type=str,          nargs=-1)
 @click.pass_context
 def lc(ctx, job_type):
     print("Spatial Classification args:")
     click_positional = {"job_type": job_type}
     utils.print_args(click_positional, None)
-    if ctx.obj["main"][ARGS_ONLY_NAME]:
+    if ctx.obj["main"]["args_only"]:
         return
 
     # We put the imports to classification managers inside of the function to not trigger
@@ -110,36 +111,41 @@ def lc(ctx, job_type):
 
 
 @main.command(help="- Spatial classification")
-@click.argument("net_type",             default="cnn",      type=str)
-@click.option("--res",                  default=(25, 25),   type=(int, int)) # to match vgg_cifar
-@click.option("--dropout_keep_prob",    default=0.50,          type=float)
-@click.option("--learning_rate",        default=0.0002,      type=float)
-@click.option("--minibatch_size",       default=1024,        type=int)
-@click.option("--dry_run",              default=False,      type=bool, is_flag=True)
-@click.option("--test_qty",             default=2048,       type=int)
+@click.argument("net_type",             default="linear",     type=str)
+@click.option("--res",                  default=(25, 25),     type=(int, int)) # to match vgg_cifar
+@click.option("--dropout_keep_prob",    default=0.50,         type=float)
+@click.option("--learning_rate",        default=0.0002,       type=float)
+@click.option("--minibatch_size",       default=1024,         type=int)
+@click.option("--dry_run",              default=False,        type=bool, is_flag=True)
+@click.option("--test_qty",             default=2048,         type=int)
 @click.option("--load_model",           default=None,)
 @click.option("--model_save_path",      default=None,)
 @click.pass_context
-def sc(ctx, net_type, **click_options):
+def sc(ctx, net_type, **args):
     # As it it quite common to leave quite a few options at their default values,
     # it is helpful to print all the values to make it less likely a default has an unexpected value.
     print("Spatial Classification args:")
     click_positional = {"net_type": net_type}
-    utils.print_args(click_positional, click_options)
-    if ctx.obj["main"][ARGS_ONLY_NAME]:
+    utils.print_args(click_positional, args)
+    if ctx.obj["main"]["args_only"]:
         return
 
-    click_options.update(click_positional)
+    # Breaks encapsulation. However, this is research code, and this allows for very quick evolution of the argument
+    # scheme. This is not production code.
+    args.update(ctx.obj["main"])
+    args.update(click_positional)
+    args = Namespace(**args) # Namespaces are easier to manipulate
 
-    # This breaks encapsulation. However, it makes adding new arguments much easier, which is the more important
-    # part in an early research project
-    click_options.update(ctx.obj["main"])
-    click_options.update(click_positional)
+    # Soft verification that we are using the time dependant mode of the data generation if we are using RNNs.
+    # The soft part is knowing whether we are actually using RNNs of course
+    lowered_net_type = args.net_type.lower()
+    if "rnn" in lowered_net_type or "lstm" in lowered_net_type or "time" in lowered_net_type:
+        assert args.is_time_dependant
 
     # We put the imports to classification managers inside of the function to not trigger
     # the very slow import of tensorflow even when just showing the help text, for example
     import spatial_classification
 
-    spatial_classification.spatial_classification(Namespace(**click_options))
+    spatial_classification.spatial_classification(args)
 
 if __name__ == "__main__": main(obj={})

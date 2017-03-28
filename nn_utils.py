@@ -27,15 +27,12 @@ def weight_variable(shape, name="weights"):
         var = tf.Variable(tf.truncated_normal(shape, 0.0, stddev=np.sqrt(2 / n)), name=name)
     return var
 
-
 def biais_variable(shape, name="bias"):
     # http://cs231n.github.io/neural-networks-2/
     with tf.name_scope(name):
         initial = tf.zeros(shape)
         var = tf.Variable(initial, name=name)
     return var
-
-
 
 def fc(input_, out_, activation, name="fully_connected"):
     in_ = input_.get_shape()[-1].value
@@ -47,7 +44,6 @@ def fc(input_, out_, activation, name="fully_connected"):
             a = tf.matmul(input_, w) + b
         h = activation(a)
     return h
-
 
 def bn_conv_layer(input_, filter_shape, stride, non_lin=tf.nn.relu):
     # http://arxiv.org/pdf/1502.03167v3.pdf
@@ -64,24 +60,17 @@ def bn_conv_layer(input_, filter_shape, stride, non_lin=tf.nn.relu):
         out = non_lin(batch_norm)
     return out
 
-
 def conv_layer(input_, filter_shape, stride, name, non_lin, dropout_keep_prob=1):
-
     with tf.name_scope(name):
         filter_ = weight_variable(filter_shape)
-        biais_ = biais_variable([filter_shape[3]])
+        biais = biais_variable([filter_shape[3]])
         conv = tf.nn.conv2d(input_, filter=filter_, strides=[1, stride, stride, 1], padding="SAME")
         with tf.name_scope("activation"):
-            activation = tf.nn.bias_add(conv, biais_)
+            activation = tf.nn.bias_add(conv, biais)
 
         activation = tf.nn.dropout(activation, dropout_keep_prob)
         out = non_lin(activation)
     return out
-
-
-def max_pool(bottom, name=None):
-    return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
-
 
 def residual_block(input_, output_depth, down_sample, projection=False, non_lin=tf.nn.relu):
     # https://arxiv.org/abs/1512.03385
@@ -110,7 +99,6 @@ def residual_block(input_, output_depth, down_sample, projection=False, non_lin=
         res = conv2 + input_layer
     return res
 
-
 class AbstractClassifier(object):
     def __init__(self, summary_writing_path):
         self._loss = None
@@ -125,7 +113,7 @@ class AbstractClassifier(object):
         self._accuracy = None
         self._labels = None
         self._right_predictions = None
-        self.summary_writing_path = summary_writing_path
+        self._summary_writing_path = summary_writing_path
 
     def finish_init(self, net, y_shape_1, expected_minibatch_size, input_size, input_dtype):
         # it's not clear that this shouldn't be in each of the little models. it has the advantage of reducing
@@ -163,8 +151,6 @@ class AbstractClassifier(object):
             tf.scalar_summary("accuracy", self._accuracy)
 
         self._merged = tf.merge_all_summaries()
-
-        AbstractClassifier.layer_sizes()
 
     @staticmethod
     def layer_sizes():
@@ -260,12 +246,12 @@ class AbstractClassifier(object):
         print("valid_x.shape: {}".format(valid_x.shape))
 
         with tf.Session() as sess:
-            if not os.path.exists(self.summary_writing_path):
-                os.mkdir(self.summary_writing_path)
-            assert os.path.exists(self.summary_writing_path)
+            if not os.path.exists(self._summary_writing_path):
+                os.mkdir(self._summary_writing_path)
+            assert os.path.exists(self._summary_writing_path)
 
-            training_writer   = tf.train.SummaryWriter(self.summary_writing_path + "/train", sess.graph)
-            validation_writer = tf.train.SummaryWriter(self.summary_writing_path + "/valid", sess.graph)
+            training_writer   = tf.train.SummaryWriter(self._summary_writing_path + "/train", sess.graph)
+            validation_writer = tf.train.SummaryWriter(self._summary_writing_path + "/valid", sess.graph)
             sess.run([tf.initialize_all_variables()])
 
             for epoch in xrange(n_epochs):
