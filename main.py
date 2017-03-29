@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 # compatibility imports
 from __future__ import with_statement, print_function, division
 import six
@@ -85,13 +86,16 @@ def main(ctx, **args):
     ctx.obj["main"]["info"] = sample_info
 
     print("Dataset properties:")
-    for i in xrange(3):
-        print("\t- {} nan/inf:    {}".format(i, np.any(np.isnan(x[i]))))
-        print("\t- {} shape:      {}".format(i, x[i].shape))
-        print("\t- {} mean:       {}".format(i, np.mean(x[i])))
-        print("\t- {} stddev:     {}".format(i, np.std(x[i])))
-        print("\t--")
-    print("--")
+    if args.is_time_dependant:
+        pass
+    else:
+        for i in xrange(3):
+            print("\t- {} nan/inf:    {}".format(i, np.any(np.isnan(x[i]))))
+            print("\t- {} shape:      {}".format(i, x[i].shape))
+            print("\t- {} mean:       {}".format(i, np.mean(x[i])))
+            print("\t- {} stddev:     {}".format(i, np.std(x[i])))
+            print("\t--")
+        print("--")
 
 
 @main.command(help="- Sequence classification")

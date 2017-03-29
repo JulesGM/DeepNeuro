@@ -294,6 +294,11 @@ def maybe_prep_psds(args):
         shape = None
 
         for i, (name, raw, label, total) in enumerate(data_gen(args.data_path, args.limit)):
+
+            if name not in fif_split:
+                # print(">>>>> {} is not in the 'fif_split.json' file!!!!".format(name))
+                continue
+
             files_lim = total if args.limit is None or total > args.limit else args.limit
             crossvalidation_set = crossvalidation_set_to_name[fif_split[name]]
 
@@ -342,7 +347,6 @@ def maybe_prep_psds(args):
             print((i, x_len))
             assert x_len > 0, "cross validation set #{} of x is empty. ".format(i)
 
-        assert not args.is_time_dependant
         if not args.is_time_dependant:
             x = [None, None, None]
             for i in xrange(3):
@@ -362,22 +366,28 @@ def maybe_prep_psds(args):
 
         else:
             x = [[], [], []]
+
             assert len(list_x) > 0, len(list_x)
             for i in xrange(3):
                 assert len(list_x[i]) > 0, len(list_x[i])
+
+
                 for j in xrange(len(list_x[i])):
                     x[i].append(np.dstack(list_x[i][j]))
                     x[i][-1] = x[i][-1].astype(np.float32)
                     x[i][-1] = x[i][-1].T
 
-                    y[i][-1] = np.asarray(y[i], np.float32)
+                    y[i][j] = np.asarray(y[i][j], np.float32)
+
                     assert np.all(np.isfinite(x[i][-1]))
                     assert np.all(np.isfinite(y[i][-1]))
 
                 no_samples_x = np.sum([x_f.shape[0] for x_f in x[i]])
                 no_samples_y = np.sum([y_f.shape[0] for y_f in y[i]])
-                assert no_samples_x == no_samples_y == utils.X_Dims.size.value, (no_samples_x, no_samples_x, utils.X_Dims.size.value)
-                assert len(x[i].shape) == utils.X_Dims.size.value
+
+                assert no_samples_x == no_samples_y
+
+
 
         # Take any valid file's position information, as all raws [are supposed to] have the same positions.
         # Deep copying it allows the garbage collector to release the raw file. Not major at all.. but still.

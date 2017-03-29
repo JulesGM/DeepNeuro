@@ -15,7 +15,7 @@ import sys
 import os
 import numpy as np
 import keras
-
+import random
 
 try: import IPython.core.ultratb # ipython like errors
 except ImportError: pass  # No IPython. Use default exception printing.
@@ -24,15 +24,33 @@ else: sys.excepthook = IPython.core.ultratb.ColorTB()
 
 def sequence_classification(x, y, job_type):
 
-    print(x.shape)
-    sys.exit(0)
+    prepared_x = [[], [], []]
+    prepared_y = [[], [], []]
+    window_size = 10
+
+    for i in range(3):
+        for j in range(len(x[i])):
+            for k in range(len(x[i][j]) - window_size + 1):
+                prepared_x[i].append(x[i][j][k:k + window_size])
+                prepared_y[i].append(y[i][j])
+
+        indices = range(len(prepared_x[i]))
+        random.shuffle(indices)
+
+        try:
+            prepared_x[i] = prepared_x[i][indices]
+            prepared_y[i] = prepared_y[i][indices]
+        except:
+            print("FAILED" * 50)
+            prepared_x[i] = [prepared_x[i][d] for d in indices]
+            prepared_y[i] = [prepared_y[i][d] for d in indices]
 
     batch_size = 16
     epochs = 10
     gru_cells = 32
 
-    x_tr, x_va, x_te = x
-    y_tr, y_va, y_te = y
+    x_tr, x_va, x_te = prepared_x
+    y_tr, y_va, y_te = prepared_y
 
     model = keras.models.Sequential()
     model.add(keras.layers.GRU(gru_cells, input_shape=[]))

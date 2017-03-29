@@ -24,12 +24,13 @@ exclude_list = [
                 "*.json",
                 "latest_save.h5",
                 "*.pkl",
+		"*.pyc",
                 ]
 
 abs_exclude_set = {re.sub("/+", "/", "{}/{}".format(BASE_PATH, rel)) for rel in exclude_list}
 abs_exclude_set.update({re.sub("/+", "/", "{}".format(rel)) for rel in glob.glob(BASE_PATH + "/" + "*.pyc")})
 
-include_set = set([BASE_PATH, "/home/jules/.PyCharm2016.1/config/scratches"])
+include_set = set([BASE_PATH, "/home/jules/.PyCharm/config/scratches"])
 
 # Doing everything we can to prevent having to do "shell=True"
 cmd = (["rsync",
