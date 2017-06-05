@@ -1,1 +1,0 @@
-sfood ../* -e 2>/dev/null | requirements_generator
