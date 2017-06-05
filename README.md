@@ -19,7 +19,7 @@ python main.py single_dim_classification [SVM, KNN, RandomForests, SKL_LR, ]
 
 python main.py spatial [keras_dense, keras_conv, tflearn_resnet, tflearn_bn_vgg, tflearn_vgg, vgg, cnn, resnet]
 
-[Todo, Not functional] python sequence_classification 
+*[Todo, Not functional]* python sequence_classification 
 
 
 
