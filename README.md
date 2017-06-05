@@ -25,23 +25,13 @@ python main.py spatial [keras_dense, keras_conv, tflearn_resnet, tflearn_bn_vgg,
 
 
 (
-
 Keywords : 
-
 mne, magnetoencephalography, meg, 
-
 python, machine learning, ml, 
-
 deep learning, dl, scikit-learn, 
-
 skl, support vector machines, svm, 
-
 random forests, neural networks, nn, 
-
 convnets, cnn, tensorflow, 
-
 tf, neuroscience, neuroimaging, 
-
 neuro psychiatry, resnet, densenet
-
 )
