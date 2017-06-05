@@ -14,7 +14,7 @@ This only includes the code. The data isn't currently directly available to the 
 
 
 #### Usage: #### 
-*The brackets mean, "pick one"*
+*The brackets mean "pick one"*.
   * python main.py single_dim_classification [SVM, KNN, RandomForests, SKL_LR, ]
 
 
