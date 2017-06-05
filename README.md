@@ -15,15 +15,15 @@ This only includes the code. The data isn't currently directly available to the 
 
 #### Usage: #### 
 *The brackets mean "pick one"*.
-  * python main.py single_dim_classification [SVM, KNN, RandomForests, SKL_LR, ]
+  * `python main.py single_dim_classification [SVM, KNN, RandomForests, SKL_LR]`
 
 
-  * python main.py spatial [keras_dense, keras_conv, tflearn_resnet, tflearn_bn_vgg, tflearn_vgg, vgg, cnn, resnet]
+  * `python main.py spatial [keras_dense, keras_conv, tflearn_resnet, tflearn_bn_vgg, tflearn_vgg, vgg, cnn, resnet]`
 
 
-  * *[Todo, Not fully functional]* python main.py sequence_classification 
+  * *[Todo, Not fully functional]* `python main.py sequence_classification` 
 
-There is a wide range of command line parameters to fiddle with everything. A few more details can be had by runnin *python main.py --help*.
+There is a wide range of command line parameters to fiddle with everything. A few more details can be had by runnin `python main.py --help`.
 
 
 #### Dependencies: ####
