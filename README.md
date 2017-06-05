@@ -23,7 +23,7 @@ This only includes the code. The data isn't currently directly available to the 
 
   * *[Todo, Not fully functional]* python main.py sequence_classification 
 
-There is a wide range of command line parameters to fiddle with everything. They are detailed in main.py.
+There is a wide range of command line parameters to fiddle with everything. A few more details can be had by runnin *python main.py --help*.
 
 
 #### Dependencies: ####
