@@ -1,4 +1,4 @@
-HIGHLY EXPERIMENTAL - This is not production code
+**HIGHLY EXPERIMENTAL** - This is not meant to look anything like production quality code.
 
 Detection of autism through the machine learning and deep learning analysis of Magnetoencephalography scans.
 
@@ -12,15 +12,28 @@ http://www.karimjerbi.com/
 
 This only includes the code. The data isn't currently directly available to the public.
 
-If you do have the data, 
+
+#### Usage: #### 
+*The brackets mean "pick one"*.
+  * python main.py single_dim_classification [SVM, KNN, RandomForests, SKL_LR]
 
 
-USAGE:
-python main.py single_dim_classification [SVM, KNN, RandomForests, SKL_LR, ]
-python main.py spatial [keras_dense, keras_conv, tflearn_resnet, tflearn_bn_vgg, tflearn_vgg, vgg, cnn, resnet]
-[Todo, Not functional] python sequence_classification 
+  * python main.py spatial [keras_dense, keras_conv, tflearn_resnet, tflearn_bn_vgg, tflearn_vgg, vgg, cnn, resnet]
 
 
+  * *[Todo, Not fully functional]* python main.py sequence_classification 
+
+There is a wide range of command line parameters to fiddle with everything. A few more details can be had by runnin `python main.py --help`.
+
+
+#### Dependencies: ####
+A whole bunch of stuff, which includes, non-exhaustively:
+- numpy
+- Tensorflow (tensorflow-gpu ideally)
+- Tflearn
+- Keras
+- Scikit-learn
+- mne
 
 
 
