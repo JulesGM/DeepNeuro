@@ -50,10 +50,10 @@ base_path = os.path.dirname(os.path.realpath(__file__))
 
 
 @click.group(invoke_without_command=True)
-@click.option("--nfft",               type=int,     default=200)# 1000 for Quarter established_bands
+@click.option("--nfft",               type=int,     default=1000) # 1000 for Quarter Established_bands
 @click.option("--fmax",               type=int,     default=200)
 @click.option("--tincr",              type=float,   default=1)
-@click.option("--established_bands",                default=False) # True, False, "quarter", "half"
+@click.option("--established_bands",                default="quarter") # True, False, "quarter", "half"
 @click.option("--limit",              type=int,     default=None)
 @click.option("--tmin",               type=int,     default=0)
 @click.option("--tmax",               type=int,     default=1000000)
@@ -108,13 +108,31 @@ def main(ctx, **args):
         print("--")
 
 
+@main.command(help="- single dimension classification")
+@click.argument("job_type",             type=str,          nargs=-1)
+@click.pass_context
+def linear(ctx, job_type):
+    print("Linear Classification args:")
+    click_positional = {"job_type": job_type}
+    utils.print_args(click_positional, None)
+    if ctx.obj["main"]["args_only"]:
+        return
+
+    # Fully connected used to be a bunch of different models
+    # We ended up deciding to focus on SVMs as they showed promising results, 
+    # and a very well tuned single result is worth a lot more than a bunch of 
+    # poorly tuned unreliable crappy results
+    import fully_connected
+    fully_connected.SVM(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
+
+
 @main.command(help="- Sequence classification")
 @click.argument("job_type", type=str, nargs=-1)
 @click.pass_context
 def sequence(ctx, job_type):
     assert False, "Not functional. "
 
-    print("Spatial Classification args:")
+    print("Sequence Classification args:")
     click_positional = {"job_type": job_type}
     utils.print_args(click_positional, None)
     if ctx.obj["main"]["args_only"]:
@@ -126,22 +144,6 @@ def sequence(ctx, job_type):
     # the very slow import of tensorflow even when just showing the help text, for example
     import sequence_classification
     sequence_classification.sequence_classification(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
-
-
-@main.command(help="- single dimension classification")
-@click.argument("job_type",             type=str,          nargs=-1)
-@click.pass_context
-def single_dim_classification(ctx, job_type):
-    print("Spatial Classification args:")
-    click_positional = {"job_type": job_type}
-    utils.print_args(click_positional, None)
-    if ctx.obj["main"]["args_only"]:
-        return
-
-    # We put the imports to classification managers inside of the function to not trigger
-    # the very slow import of tensorflow even when just showing the help text, for example
-    import fully_connected
-    fully_connected.fully_connected(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
 
 
 @main.command(help="- Spatial classification")

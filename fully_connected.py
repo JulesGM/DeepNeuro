@@ -10,11 +10,10 @@ import numpy as np
 
 # Sklearn imports
 from sklearn.svm import SVC
-from sklearn.svm import LinearSVC
-from sklearn.linear_model import logistic
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
 import sklearn.preprocessing
+
+import subprocess
+import concurrent.futures as futures
 
 
 def make_samples_linear(x):
@@ -24,10 +23,8 @@ def make_samples_linear(x):
     return linear_x
 
 
-def fully_connected(x, y, job):
+def SVM(x, y, job):
     linear_x = [None, None, None]
-
-    print("Training shape:")
 
     for i in xrange(3):
         linear_x[i] = make_samples_linear(x[i])
@@ -48,93 +45,35 @@ def fully_connected(x, y, job):
     valid_y = y[1]
     test_y = y[2]
 
-    classifiers = []
+    classifier_futures = []
 
-    print("Creating the classifiers")
+    def chain(cl, training_x, training_y, valid_x):
+        cl.fit(training_x, training_y)
+        preds = cl.predict(valid_x)
+        return cl, preds, cl.score(training_x, training_y), cl.score(valid_x, valid_y), np.mean(preds)
 
-    if "NN" in job:
-        classifiers.append(
-            nn_models.FFNN(
-                x_shape_1=linear_x[0].shape,
-                y_shape_1=2, depth=1, width_hidden_layers=10,
-                dropout_keep_prob=0.5, l2_c=1))
-
-    if "SVM" in job:
-        c_const = 10.
-        gamma_const = 10.
-
-        for c_exp in xrange(-10, 10, 2):
-            for gamma_exp in xrange(-10, 10, 2):
-                classifiers.append(
-                    SVC(C=c_const ** c_exp,
-                        gamma=gamma_const ** gamma_exp,
-                        kernel="linear",
-                        #verbose=False,
-                        verbose=True,
-                        max_iter=300
-                        ))
-
-    if "rbf" in job:
-        assert False, "Not functional"
-        c_const = 10.
-        gamma_const = 10.
-
-        for c_exp in xrange(-10, 10, 3):
-            for gamma_exp in xrange(-10, 10, 3):
-                for degree in xrange(3, 7, 2):
-                    classifiers.append(
-                        SVC(C=c_const ** c_exp,
-                            gamma=gamma_const ** gamma_exp,
-                            degree=degree,
-                            kernel="rbf",
-                            #verbose=False,
-                            verbose=True,
-                            max_iter=300
-                            ))
-
-    if "KNN" in job:
-        for metric in ["minkowski", "euclidean", "manhattan", "chebyshev", "wminkowski", "seuclidean", "mahalanobis"]:
-            for knn_exp in xrange(6):
-                classifiers.append(KNeighborsClassifier(n_neighbors=2.**knn_exp, metric=metric))
-
-    if "RandomForests" in job:
-        for rf_n_estimators_exp in xrange(10):
-            classifiers.append(RandomForestClassifier(n_estimators =2. ** rf_n_estimators_exp ))
-
-    if "SKL_LR" in job:
-        tol_const = 10.
-        c_const = 10.
-        for tol_exp in xrange(-5, -3, 1):
-            for c_exp in xrange(-5, 1, 1):
-                classifiers.append(logistic.LogisticRegression(max_iter=10000, verbose=10, tol=tol_const ** tol_exp,
-                                                               C=c_const ** c_exp))
-
-    assert len(classifiers) > 0, "No classifier to test."
-
-    print("--")
-    one_hot_set = {nn_models.FFNN}
-    print("Doing linear classification")
-    for classifier in classifiers:
-        # If it's an sklearn classifier..
-        print(classifier)
-        if isinstance(classifier, sklearn.base.ClassifierMixin):
-            cl = classifier.fit(training_x, training_y)
-            # print("\t- Making predictions and calculating the accuracy scores")
-            preds_1 = cl.predict(valid_x)
-            print("\t- Training score:   {}".format(cl.score(training_x, training_y)))
-            print("\t- Valid score:      {}".format(cl.score(valid_x, valid_y)))
-            print("\t- valid avg:        {}".format(np.mean(preds_1)))
+    c_const = 10.
+    arg_combinations = []
+    c_exp = 0.01
+    print("STARTING")
+    with futures.ThreadPoolExecutor(max_workers=int(subprocess.check_output("nproc")) - 1) as executor:
+        for max_iter in range(11, 30, 2):
+            cl = SVC(C=c_const ** c_exp,
+                    kernel="linear",
+                    #verbose=False,
+                    # verbose=True, # http://scikit-learn.org/stable/modules/generated/sklearn.svm.LinearSVC.html says that SVCs are somehow not thread safe when 
+                    # verbose is on.
+                    max_iter=max_iter * 100
+                    )
+            classifier_futures.append(executor.submit(chain, cl, training_x, training_y, valid_x))
+                    
+        print("--")
+        print("Doing linear classification")
+        for classifier_future in classifier_futures:
+            cl, preds, tr_score, va_score, mean_preds = classifier_future.result()
             print("\t- classif obj:      {}".format(cl))
+            print("\t- Training score:   {}".format(tr_score))
+            print("\t- Valid score:      {}".format(va_score))
+            print("\t- valid avg:        {}".format(mean_preds))
             print("\t--")
-
-        else:
-            if type(classifier) in one_hot_set:
-                y = [utils.to_one_hot(_y, 2) for _y in y[:2]]
-
-            classifier.fit(
-                train_x=linear_x[0],    train_y=y[0],
-                valid_x=linear_x[1],    valid_y=y[1],
-                n_epochs=1000000,       minibatch_size=1028,
-                learning_rate=0.0001)
-
 

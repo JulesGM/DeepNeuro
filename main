@@ -1,0 +1,40 @@
+#! /usr/bin/env python
+from __future__ import division
+from six import iteritems
+from six.moves import range, zip
+
+import sys
+import os
+import subprocess
+import datetime
+import shutil
+
+def str_timestamp(dt=None):
+
+    if dt is None:
+        dt = datetime.datetime.now()
+    return "{day:02}-{month:02}-{year:04}_{hour_over_24:02}-{minutes:02}-{seconds:02}".format(
+        day=dt.day, month=dt.month, year=dt.year, hour_over_24=dt.hour, minutes=dt.minute, seconds=dt.second)
+    
+
+
+def start_tee(output_path):
+	sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+
+	tee = subprocess.Popen(["tee", output_path], stdin=subprocess.PIPE)
+
+	os.dup2(tee.stdin.fileno(), sys.stdout.fileno())
+	os.dup2(tee.stdin.fileno(), sys.stderr.fileno())
+
+	
+
+LOG_PATH = "/media/hdd1/neuro_logs"
+
+file_name = str_timestamp()
+log_folder = os.path.join(LOG_PATH, file_name)
+
+os.system("mkdir {}".format(log_folder))
+os.system("cp -v ./*.ipynb ./*.py {}".format(log_folder))
+os.system("cp -vr ./utils {}".format(log_folder))
+start_tee(os.path.join("/media/hdd1/neuro_logs/", file_name + ".log"))
+os.system(" ".join([sys.executable, "main.py"] + sys.argv[1:]))
