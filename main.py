@@ -122,8 +122,8 @@ def linear(ctx, job_type):
     # We ended up deciding to focus on SVMs as they showed promising results, 
     # and a very well tuned single result is worth a lot more than a bunch of 
     # poorly tuned unreliable crappy results
-    import fully_connected
-    fully_connected.SVM(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
+    from classifiers.SVM_rbf import experiment
+    experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"])
 
 
 @main.command(help="- Sequence classification")
