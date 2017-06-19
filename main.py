@@ -122,7 +122,7 @@ def linear(ctx, job_type):
     # We ended up deciding to focus on SVMs as they showed promising results, 
     # and a very well tuned single result is worth a lot more than a bunch of 
     # poorly tuned unreliable crappy results
-    from classifiers.SVM_rbf import experiment
+    from models.linear_classifiers.SVM_rbf import experiment
     experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"])
 
 
@@ -142,8 +142,8 @@ def sequence(ctx, job_type):
 
     # We put the imports to classification managers inside of the function to not trigger
     # the very slow import of tensorflow even when just showing the help text, for example
-    import sequence_classification
-    sequence_classification.sequence_classification(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
+    from models.temporal_classigiers.sequence_classification import experiment
+    experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
 
 
 @main.command(help="- Spatial classification")

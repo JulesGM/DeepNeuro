@@ -204,6 +204,8 @@ def _psd_time_unit_cut(args, i, j, raw, files_lim, total, psd_band_t_start_ms, u
                                                     percentage=100 * psd_band_t_start_ms / upper_bound))
         sys.stderr.flush()
 
+
+    
     psds, freqs = mne.time_frequency.psd_welch(n_jobs=1,
                                                inst=raw,
                                                picks=mne.pick_types(raw.info, meg=args.sensor_type),
@@ -211,7 +213,7 @@ def _psd_time_unit_cut(args, i, j, raw, files_lim, total, psd_band_t_start_ms, u
                                                n_overlap=args.noverlap,
                                                tmin=psd_band_t_start_ms / 1000.,
                                                tmax=psd_band_t_start_ms / 1000. + args.tincr,
-                                               fmax=(min(100, args.fmax) if args.established_bands else args.fmax),
+                                               fmax=(min(100, args.fmax) if args.established_bands else args.fmax), # wtf is this
                                                verbose="INFO"
                                                )
 
