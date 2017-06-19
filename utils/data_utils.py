@@ -205,7 +205,7 @@ def _psd_time_unit_cut(args, i, j, raw, files_lim, total, psd_band_t_start_ms, u
         sys.stderr.flush()
 
 
-    
+
     psds, freqs = mne.time_frequency.psd_welch(n_jobs=1,
                                                inst=raw,
                                                picks=mne.pick_types(raw.info, meg=args.sensor_type),
@@ -218,7 +218,7 @@ def _psd_time_unit_cut(args, i, j, raw, files_lim, total, psd_band_t_start_ms, u
                                                )
 
     # We don't want to merge grads anymore
-    #if args.sensor_type == "grad":
+    # if args.sensor_type == "grad":
     #    # We already only have grad values
     #    psds = _merge_grad_data(psds)
 

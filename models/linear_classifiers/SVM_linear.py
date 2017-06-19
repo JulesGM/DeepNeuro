@@ -60,13 +60,13 @@ def experiment(x, y):
             classifier_futures.append(executor.submit(chain, cl, training_x, training_y, valid_x))
                     
                     
-    print("--")
-    print("Doing linear classification")
-    for classifier_future in classifier_futures:
-        cl, preds, tr_score, va_score, mean_preds = classifier_future.result()
-        print("\t- classif obj:      {}".format(cl))
-        print("\t- Training score:   {}".format(tr_score))
-        print("\t- Valid score:      {}".format(va_score))
-        print("\t- valid avg:        {}".format(mean_preds))
-        print("\t--")
+        print("--")
+        print("Doing linear classification")
+        for classifier_future in classifier_futures:
+            cl, preds, tr_score, va_score, mean_preds = classifier_future.result()
+            print("\t- classif obj:      {}".format(cl))
+            print("\t- Training score:   {}".format(tr_score))
+            print("\t- Valid score:      {}".format(va_score))
+            print("\t- valid avg:        {}".format(mean_preds))
+            print("\t--")
 

@@ -13,8 +13,26 @@ import sklearn.preprocessing
 
 import subprocess
 import concurrent.futures as futures
+import ctypes
+import numpy as np
 
 from . import make_samples_linear
+
+def shared_array(copy_from):
+    shared_array_base = multiprocessing.Array(ctypes.c_double, np.product(copy_from.shape))
+    shared_array = np.frombuffer(shared_array_base.get_obj()).reshape(*copy_from.shape)
+    shared_array = shared_array.reshape(copy_from.shape)
+    shared_array[...] = copy_from[...]
+    assert shared_array.base.base is shared_array_base.get_obj()
+
+    return shared_array
+
+
+def chain(cl, training_x, training_y, valid_x):
+    cl.fit(training_x, training_y)
+    preds = cl.predict(valid_x)
+    return cl, preds, cl.score(training_x, training_y), cl.score(valid_x, valid_y), np.mean(preds)
+
 
 def experiment(x, y):
     linear_x = [None, None, None]
@@ -40,30 +58,25 @@ def experiment(x, y):
 
     
 
-    def chain(cl, training_x, training_y, valid_x):
-        cl.fit(training_x, training_y)
-        preds = cl.predict(valid_x)
-        return cl, preds, cl.score(training_x, training_y), cl.score(valid_x, valid_y), np.mean(preds)
 
     c_const = 10.
     arg_combinations = []
     classifier_futures = []
-    c_exp = 0.01
     print("STARTING")
-    # libsvm releases the GIL, so a multithreaded execution does indeed speed things up quite a bit.
-    with futures.ThreadPoolExecutor(max_workers=int(subprocess.check_output("nproc")) - 1) as executor:
+    
+    with futures.ProcessPoolExecutor(max_workers=int(subprocess.check_output("nproc")) - 1) as executor:
         for n_estimators_exp in range(1, 5):
             for max_features_exp in range(1, 20, 2):
                 cl = RandomForestClassifier(n_estimators=10**n_estimators_exp, max_features=10**max_features_exp)
                 classifier_futures.append(executor.submit(chain, cl, training_x, training_y, valid_x))
-                        
-    print("--")
-    print("Doing linear classification")
-    for classifier_future in classifier_futures:
-        cl, preds, tr_score, va_score, mean_preds = classifier_future.result()
-        print("\t- classif obj:      {}".format(cl))
-        print("\t- Training score:   {}".format(tr_score))
-        print("\t- Valid score:      {}".format(va_score))
-        print("\t- valid avg:        {}".format(mean_preds))
-        print("\t--")
+            
+        print("--")
+        print("Doing random forests based classification")
+        for classifier_future in classifier_futures:
+            cl, preds, tr_score, va_score, mean_preds = classifier_future.result()
+            print("\t- classif obj:      {}".format(cl))
+            print("\t- Training score:   {}".format(tr_score))
+            print("\t- Valid score:      {}".format(va_score))
+            print("\t- valid avg:        {}".format(mean_preds))
+            print("\t--")
 
