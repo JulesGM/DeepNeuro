@@ -142,8 +142,8 @@ def sequence(ctx, job_type):
 
     # We put the imports to classification managers inside of the function to not trigger
     # the very slow import of tensorflow even when just showing the help text, for example
-    from models.temporal_classigiers.sequence_classification import experiment
-    experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
+    import sequence_classification
+    sequence_classification.sequence_classification(ctx.obj["main"]["x"], ctx.obj["main"]["y"], job_type)
 
 
 @main.command(help="- Spatial classification")

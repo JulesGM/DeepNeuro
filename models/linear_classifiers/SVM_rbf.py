@@ -50,15 +50,11 @@ def experiment(x, y):
     classifier_futures = []
     print("STARTING")
     
-    ####################################################
-    # CHECK THE LATEST RESULTS WE HAD REALLY GOOD ONES
-    ####################################################
     with futures.ThreadPoolExecutor(max_workers=int(subprocess.check_output("nproc")) - 1) as executor:
-        for i in range(0, 5, 2):
-            for j in range(0, 9, 2):
-
-                C = 0.001 + i * 0.001
-                gamma = 0.001 + j * 0.001
+        for i in range(0, 10):
+            for j in range(0, 20, 2):
+                C = 0.0083 + i * 0.00001
+                gamma = 0.0026 + j * 0.0001
 
                 if gamma <= 0:
                     print("GAMMA <= 0, SKIPPING")
@@ -68,20 +64,20 @@ def experiment(x, y):
                     continue
 
                 cl = SVC(C=C,
-                         gamma=gamma,
-                         kernel="rbf",
-                         max_iter=2000
-                         )
+                     gamma=gamma,
+                     kernel="rbf",
+                     max_iter=2000
+                     )
 
                 classifier_futures.append(executor.submit(chain, cl, training_x, training_y, valid_x))
             
-        print("--")
-        print("Doing linear classification")
-        for classifier_future in classifier_futures:
-            cl, preds, tr_score, va_score, mean_preds = classifier_future.result()
-            print("\t- classif obj:      {}".format(cl))
-            print("\t- Training score:   {}".format(tr_score))
-            print("\t- Valid score:      {}".format(va_score))
-            print("\t- valid avg:        {}".format(mean_preds))
-            print("\t--")
+    print("--")
+    print("Doing linear classification")
+    for classifier_future in classifier_futures:
+        cl, preds, tr_score, va_score, mean_preds = classifier_future.result()
+        print("\t- classif obj:      {}".format(cl))
+        print("\t- Training score:   {}".format(tr_score))
+        print("\t- Valid score:      {}".format(va_score))
+        print("\t- valid avg:        {}".format(mean_preds))
+        print("\t--")
 
