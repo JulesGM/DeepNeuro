@@ -24,7 +24,7 @@ GPU_INDEX = 0
 MOMENTUM = 0.9
 DECAY_STEP = 200000
 DECAY_RATE = 0.7
-DEPTH = 20
+DEPTH = 22
 
 LOG_DIR = "./log"
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
@@ -69,6 +69,9 @@ def get_bn_decay(batch):
 
 def train(x, y):
     assert NUM_POINT == x[0].shape[1], (NUM_POINT, x[0].shape[1])
+    for i in range(len(y)):
+        y[i] = np.int32(y[i])
+
 
     with tf.Graph().as_default():
         with tf.device('/gpu:'+str(GPU_INDEX)):
@@ -83,8 +86,8 @@ def train(x, y):
             tf.summary.scalar('bn_decay', bn_decay)
 
             # Get model and loss 
-            pred, end_points = MODEL.get_model(pointclouds_pl, is_training_pl, bn_decay=bn_decay)
-            loss = MODEL.get_loss(pred, labels_pl, end_points)
+            pred, end_points = MODEL.get_model(pointclouds_pl, is_training_pl, DEPTH)
+            loss = MODEL.get_loss(pred, labels_pl)
             tf.summary.scalar('loss', loss)
 
             correct = tf.equal(tf.argmax(pred, 1), tf.to_int64(labels_pl))
@@ -94,10 +97,7 @@ def train(x, y):
             # Get training operator
             learning_rate = get_learning_rate(batch)
             tf.summary.scalar('learning_rate', learning_rate)
-            if OPTIMIZER == 'momentum':
-                optimizer = tf.train.MomentumOptimizer(learning_rate, momentum=MOMENTUM)
-            elif OPTIMIZER == 'adam':
-                optimizer = tf.train.AdamOptimizer(learning_rate)
+            optimizer = tf.train.AdamOptimizer(learning_rate)
             train_op = optimizer.minimize(loss, global_step=batch)
             
             # Add ops to save and restore all the variables.
@@ -150,12 +150,8 @@ def train(x, y):
 def train_one_epoch(sess, ops, train_writer, x_tr, y_tr):
     """ ops: dict mapping from string to tf ops """
     
-    # Shuffle train files
-    train_file_idxs = np.arange(0, len(TRAIN_FILES))
-    np.random.shuffle(train_file_idxs)
     
-
-    log_string('----' + str(fn) + '-----')
+    log_string('---------')
 
     current_data, current_label = x_tr, y_tr
     
@@ -197,9 +193,9 @@ def eval_one_epoch(sess, ops, test_writer, x_va, y_va):
     total_seen_class = [0 for _ in range(NUM_CLASSES)]
     total_correct_class = [0 for _ in range(NUM_CLASSES)]
         
-    log_string('----' + str(fn) + '-----')
+    log_string('---------')
 
-    current_data, current_label = x_tr, y_tr    
+    current_data, current_label = x_va, y_va    
     num_batches = current_data.shape[0] // BATCH_SIZE
     
     total_correct = 0
@@ -221,6 +217,7 @@ def eval_one_epoch(sess, ops, test_writer, x_va, y_va):
         total_correct += correct
         total_seen += BATCH_SIZE
         loss_sum += (loss_val * BATCH_SIZE)
+        
         for i in range(start_idx, end_idx):
             l = current_label[i]
             total_seen_class[l] += 1
