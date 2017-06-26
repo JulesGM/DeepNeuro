@@ -1,19 +1,65 @@
 # Compatibility imports
 from __future__ import with_statement, print_function, division, absolute_import
 import six
-from six.moves import range as xrange
-from six.moves import zip as izip
+from six.moves import range
+from six.moves import zip
 
 import numpy as np
-
-# Sklearn imports
-from sklearn.svm import SVC
 import sklearn.preprocessing
 
 import subprocess
 import concurrent.futures as futures
 
-from utils import make_samples_linear
+from . import make_samples_linear
+
+
+
+
+def get_acc(preds_tf, labels_tf):
+    assert False, "test this.. really not sure"
+    return tf.reduce_mean(tf.equal(tf.argmax(preds_tf, axis=1), labels_tf), axis=0)
+
+
+def train():
+    inputs_tf, labels_tf = placeholder_inputs(batch_size, num_point, depth)
+    preds_tf, _ = get_model(inputs_tf, is_training_tf)
+    loss_tf = get_loss(preds_tf, labels_tf)
+    softmax_preds_tf = tf.nn.softmax(preds_tf)
+    acc_tf = get_acc(preds_tf, labels_tf)
+    step_tf = tf.Variable(0)
+    training_tf = tf.train.AdamOptimizer().minimize(loss_tf, global_step=step_tf)
+    init_tf = tf.initialize_all_variables()
+    tf.summary.scalar('accuracy', acc_tf)
+
+
+    
+    merged = tf.summary.merge_all()
+    train_writer = tf.summary.FileWriter(os.path.join(LOG_DIR, 'train'), sess.graph)
+    test_writer = tf.summary.FileWriter(os.path.join(LOG_DIR, 'test'))
+
+    with tf.Session() as tf_session:
+        tf_session.run([init_tf])
+
+        for epoch in epochs:
+            for inputs_np, labels_np in epoch_tr:                
+                    feed_dict = {
+                        inputfs_tf: inputs_np,
+                        labels_tf:  labels_np,
+                        is_training_tf: True,
+
+                    }
+                    _, softmax_pred_np, loss_np, acc_np = tf_session.run([training_tf, softmax_preds_tf, loss_tf, acc_tf], feed_dict=feed_dict)
+
+
+            for inputs_np, labels_np in epoch_va:
+                for inputs_np, labels_np in epoch_va:                
+                    feed_dict = {
+                        inputfs_tf: inputs_np,
+                        labels_tf:  labels_np,
+                        is_training_tf: false,
+                        }
+                    softmax_pred_np, loss_np, acc_np = tf_session.run([softmax_preds_tf, loss_tf, acc_tf], feed_dict=feed_dict)
+
 
 def experiment(x, y):
     linear_x = [None, None, None]
@@ -40,16 +86,19 @@ def experiment(x, y):
     
 
     def chain(cl, training_x, training_y, valid_x):
+        """
+        """
         cl.fit(training_x, training_y)
         preds = cl.predict(valid_x)
         return cl, preds, cl.score(training_x, training_y), cl.score(valid_x, valid_y), np.mean(preds)
+
 
     c_const = 10.
     arg_combinations = []
     classifier_futures = []
     c_exp = 0.01
-    print("STARTING")
-    # libsvm releases the GIL, so a multithreaded execution does indeed speed things up quite a bit.
+    
+
     with futures.ThreadPoolExecutor(max_workers=int(subprocess.check_output("nproc")) - 1) as executor:
         for max_iter in range(29, 60, 2):
             cl = SVC(C=c_const ** c_exp,

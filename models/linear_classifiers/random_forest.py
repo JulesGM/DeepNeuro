@@ -16,7 +16,8 @@ import concurrent.futures as futures
 import ctypes
 import numpy as np
 
-from . import make_samples_linear
+from utils import make_samples_linear
+
 
 def shared_array(copy_from):
     shared_array_base = multiprocessing.Array(ctypes.c_double, np.product(copy_from.shape))
@@ -64,7 +65,7 @@ def experiment(x, y):
     classifier_futures = []
     print("STARTING")
     
-    with futures.ProcessPoolExecutor(max_workers=int(subprocess.check_output("nproc")) - 1) as executor:
+    with futures.ProcessPoolExecutor(max_workers=int(subprocess.check_output("nproc")) // 2 - 1) as executor:
         for n_estimators_exp in range(1, 5):
             for max_features_exp in range(1, 20, 2):
                 cl = RandomForestClassifier(n_estimators=10**n_estimators_exp, max_features=10**max_features_exp)

@@ -6,16 +6,6 @@ import six
 from six.moves import range as xrange
 from six.moves import zip as izip
 
-
-
-__author__ = "Jules Gagnon-Marchand"
-__credits__ = ["Jules Gagnon-Marchand"]
-__license__ = "GPL"
-__maintainer__ = "Jules Gagnon-Marchand"
-__email__ = "jgagnonmarchand@gmail.com"
-__status__ = "Research"
-
-
 # stdlib imports
 import os
 import logging
@@ -25,20 +15,10 @@ from argparse import Namespace
 import utils
 import utils.data_utils
 
-
 # external imports
 import numpy as np
 import click
 
-# ipython like formatted errors
-try:
-    import IPython.core.ultratb
-except ImportError:
-    # No IPython. Use default exception printing.
-    pass
-else:
-    import sys
-    sys.excepthook = IPython.core.ultratb.ColorTB()
 
 """
 MNE's logger prints massive amount of useless stuff, and neither mne.set_logging_level(logging.ERROR) or
@@ -64,6 +44,9 @@ base_path = os.path.dirname(os.path.realpath(__file__))
 @click.option("--args_only",          is_flag=True)
 @click.pass_context
 def main(ctx, **args):
+    """ This part prepares the data.
+
+    """
     if ctx.invoked_subcommand is None:
         print("############################################################################################\n"
               "\n   Warning : \n"
@@ -108,21 +91,27 @@ def main(ctx, **args):
         print("--")
 
 
-@main.command(help="- single dimension classification")
-@click.argument("job_type",             type=str,          nargs=-1)
-@click.pass_context
-def linear(ctx, job_type):
-    print("Linear Classification args:")
-    click_positional = {"job_type": job_type}
-    utils.print_args(click_positional, None)
-    if ctx.obj["main"]["args_only"]:
-        return
+##
+# The different models each have a different point of entry
 
-    # Fully connected used to be a bunch of different models
-    # We ended up deciding to focus on SVMs as they showed promising results, 
-    # and a very well tuned single result is worth a lot more than a bunch of 
-    # poorly tuned unreliable crappy results
+@main.command(help="- single dimension classification")
+@click.pass_context
+def SVM_rbf(ctx):
     from models.linear_classifiers.SVM_rbf import experiment
+    experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"])
+
+
+@main.command(help="- single dimension classification")
+@click.pass_context
+def SVM_linear(ctx):
+    from models.linear_classifiers.SVM_linear import experiment
+    experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"])
+
+
+@main.command(help="- Point based spatial classification")
+@click.pass_context
+def point_based(ctx, net_type):
+    from models.spatial_classifiers.point_based.modified_pointnet_train import expriment
     experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"])
 
 
@@ -130,7 +119,7 @@ def linear(ctx, job_type):
 @click.argument("job_type", type=str, nargs=-1)
 @click.pass_context
 def sequence(ctx, job_type):
-    assert False, "Not functional. "
+    assert False, "NOT FUNCTIONAL"
 
     print("Sequence Classification args:")
     click_positional = {"job_type": job_type}
@@ -147,7 +136,7 @@ def sequence(ctx, job_type):
 
 
 @main.command(help="- Spatial classification")
-@click.argument("net_type",             default="linear",     type=str)
+@click.argument("net_type",             default="conv",     type=str)
 @click.option("--res",                  default=(25, 25),     type=(int, int)) # to match vgg_cifar
 @click.option("--dropout_keep_prob",    default=0.50,         type=float)
 @click.option("--learning_rate",        default=0.0002,       type=float)
@@ -157,7 +146,7 @@ def sequence(ctx, job_type):
 @click.option("--load_model",           default=None,)
 @click.option("--model_save_path",      default=None,)
 @click.pass_context
-def spatial(ctx, net_type, **args):
+def conv(ctx, net_type, **args):
     # As it it quite common to leave quite a few options at their default values,
     # it is helpful to print all the values to make it less likely a default has an unexpected value.
     print("Spatial Classification args:")

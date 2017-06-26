@@ -13,7 +13,7 @@ import sklearn.preprocessing
 import subprocess
 import concurrent.futures as futures
 
-from . import make_samples_linear
+from utils import make_samples_linear
 
 
 def experiment(x, y):

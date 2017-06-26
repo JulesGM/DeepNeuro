@@ -1,17 +1,7 @@
 #! /usr/bin/env python
 from __future__ import division, print_function, with_statement
-
-"""  """
 from six import iteritems
 from six.moves import xrange, zip as izip
-
-__author__ = "Jules Gagnon-Marchand"
-__credits__ = ["Jules Gagnon-Marchand"]
-__license__ = "GPL"
-__maintainer__ = "Jules Gagnon-Marchand"
-__email__ = "jgagnonmarchand@gmail.com"
-__status__ = "Research"
-
 import sys
 import os
 
@@ -22,20 +12,6 @@ import numpy.random
 import click
 import h5py
 from matplotlib import pyplot as plt
-
-# ipython like errors
-try:
-    import IPython.core.ultratb
-except ImportError:
-    # No IPython. Use default exception printing.
-    pass
-else:
-    import sys
-
-    sys.excepthook = IPython.core.ultratb.ColorTB()
-
-
-
 
 
 @click.command()
