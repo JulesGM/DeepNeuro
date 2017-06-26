@@ -112,7 +112,7 @@ def SVM_linear(ctx):
 @click.pass_context
 def point_based(ctx):
     from models.spatial_classifiers.point_based.modified_pointnet_train import experiment
-    experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"])
+    experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"], ctx.obj["main"]["info"])
 
 
 @main.command(help="- Sequence classification")

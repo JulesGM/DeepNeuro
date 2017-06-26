@@ -7,28 +7,31 @@ import socket
 import importlib
 import os
 import sys
+import sklearn.preprocessing
+
 import tf_util
 
-import modified_pointnet_cls_basic as model
+
+import modified_pointnet_cls_basic as MODEL
+from point_based_jutils import *
 
 
 BATCH_SIZE = 32
-NUM_POINT = 1024
+NUM_POINT = 204
 MAX_EPOCH = 250
 BASE_LEARNING_RATE = 0.001
 GPU_INDEX = 0
 MOMENTUM = 0.9
 DECAY_STEP = 200000
 DECAY_RATE = 0.7
-
+DEPTH = 20
 
 LOG_DIR = "./log"
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
 
 
-MAX_NUM_POINT = 2048
-NUM_CLASSES = 40
+NUM_CLASSES = 2
 
 BN_INIT_DECAY = 0.5
 BN_DECAY_DECAY_RATE = 0.5
@@ -228,18 +231,13 @@ def eval_one_epoch(sess, ops, test_writer, x_va, y_va):
     log_string('eval avg class acc: %f' % (np.mean(np.array(total_correct_class)/np.array(total_seen_class,dtype=np.float))))
          
 
-def experiment(x, y):
+def experiment(x, y, info):
     point_x = [None, None, None]
 
     for i in xrange(3):
-        point_x[i] = make_pointbased_with_positions(x[i])
+        point_x[i] = make_pointbased_with_positions(x[i], info, "grad")
 
-    scaler = sklearn.preprocessing.StandardScaler()
-    point_x[0] = scaler.fit_transform(point_x[0])
-    point_x[1] = scaler.transform(point_x[1])
-    point_x[2] = scaler.transform(point_x[2])
-
-    assert len(linear_x) == 3
+    assert len(point_x) == 3
     assert len(y) == 3
 
     training_x = point_x[0]
