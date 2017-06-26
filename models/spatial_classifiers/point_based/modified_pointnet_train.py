@@ -24,10 +24,8 @@ DECAY_RATE = 0.7
 
 LOG_DIR = "./log"
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
-os.system('cp %s %s' % (MODEL_FILE, LOG_DIR)) # bkp of model def
-os.system('cp train.py %s' % (LOG_DIR)) # bkp of train procedure
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
-LOG_FOUT.write(str(FLAGS)+'\n')
+
 
 MAX_NUM_POINT = 2048
 NUM_CLASSES = 40
@@ -230,7 +228,7 @@ def eval_one_epoch(sess, ops, test_writer, x_va, y_va):
     log_string('eval avg class acc: %f' % (np.mean(np.array(total_correct_class)/np.array(total_seen_class,dtype=np.float))))
          
 
-def expriment(x, y):
+def experiment(x, y):
     point_x = [None, None, None]
 
     for i in xrange(3):

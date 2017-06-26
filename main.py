@@ -110,8 +110,8 @@ def SVM_linear(ctx):
 
 @main.command(help="- Point based spatial classification")
 @click.pass_context
-def point_based(ctx, net_type):
-    from models.spatial_classifiers.point_based.modified_pointnet_train import expriment
+def point_based(ctx):
+    from models.spatial_classifiers.point_based.modified_pointnet_train import experiment
     experiment(ctx.obj["main"]["x"], ctx.obj["main"]["y"])
 
 
