@@ -1,4 +1,4 @@
-**HIGHLY EXPERIMENTAL** - This is not meant to look anything like production quality code.
+**HIGHLY EXPERIMENTAL** 
 
 Detection of autism through the machine learning and deep learning analysis of Magnetoencephalography scans.
 
