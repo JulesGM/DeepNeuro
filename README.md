@@ -1,4 +1,4 @@
-**HIGHLY EXPERIMENTAL** 
+
 
 Detection of autism through the machine learning and deep learning analysis of Magnetoencephalography scans.
 
